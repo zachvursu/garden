@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#38583F" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Garden" />
+<title>The Garden</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --paper:#EDECE0;--card:#F6F5EC;--ink:#22271F;--soft:#5A6350;
+  --green:#38583F;--green-d:#2A4531;--ochre:#C6892F;--brick:#9E4A2C;--line:#D8D6C6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--paper);color:var(--ink);
+  -webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+#app{max-width:720px;margin:0 auto;min-height:100vh;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+img{-webkit-user-drag:none;user-select:none}
+button{font-family:inherit}
+
+.screen{padding:18px 16px 24px;animation:fade .24s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-top:calc(6px + env(safe-area-inset-top))}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ochre);font-weight:600}
+.title{font-family:'Fraunces',serif;font-weight:500;font-size:36px;line-height:1;margin:4px 0 0}
+.title.sm{font-size:26px;margin-top:6px}
+.stats{display:flex;gap:15px;margin-left:auto}
+.stat{text-align:right}
+.stat-n{font-family:'Fraunces',serif;font-size:23px;line-height:1;color:var(--green-d)}
+.stat-l{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);margin-top:2px}
+
+.btn{background:var(--green);color:#F6F5EC;border:none;font:inherit;font-weight:600;padding:11px 20px;border-radius:9px;cursor:pointer;transition:background .15s}
+.btn:active{background:var(--green-d)}
+.btn:disabled{opacity:.4}
+.btn.ghost{background:transparent;color:var(--green-d);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.sm{padding:8px 14px;font-size:13px}
+.btn.xs{padding:6px 12px;font-size:12px;border-radius:7px}
+.btn.wide{width:100%}
+.linkbtn{background:none;border:none;color:var(--green-d);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:0}
+.back{background:none;border:none;color:var(--soft);font:inherit;font-size:14px;cursor:pointer;padding:0 0 8px}
+
+.empty{text-align:center;padding:40px 20px;border:1px dashed var(--line);border-radius:14px;background:var(--card)}
+.empty-h{font-family:'Fraunces',serif;font-size:22px;margin:6px 0 6px}
+.empty-p{color:var(--soft);font-size:14px;line-height:1.55;max-width:46ch;margin:0 auto 16px}
+.muted{color:var(--soft);font-size:13.5px}
+.sublabel{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:10px}
+.sublabel-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+
+/* diary capture */
+.capture{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:18px;display:flex;gap:12px;align-items:center}
+.bigmic{flex:0 0 auto;width:56px;height:56px;border-radius:50%;border:none;background:var(--green);color:#F6F5EC;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(42,69,49,.3)}
+.bigmic svg{width:26px;height:26px;fill:currentColor}
+.capture-txt{flex:1}
+.capture-txt b{font-family:'Fraunces',serif;font-weight:500;font-size:17px;display:block}
+.capture-txt span{font-size:12.5px;color:var(--soft)}
+
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:16px}
+.segb{background:none;border:none;font:inherit;font-size:13px;font-weight:500;color:var(--soft);padding:7px 15px;border-radius:7px;cursor:pointer}
+.segb.on{background:var(--green);color:#fff}
+
+.filterrow{display:flex;gap:7px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.filterrow::-webkit-scrollbar{display:none}
+.fchip{flex:0 0 auto;background:var(--card);border:1px solid var(--line);font:inherit;font-size:12.5px;color:var(--soft);padding:6px 12px;border-radius:16px;cursor:pointer;white-space:nowrap}
+.fchip.on{color:#fff}
+
+/* journal cards */
+.jcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px;margin-bottom:13px;position:relative}
+.jcard-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.badge{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px}
+.badge.sm{font-size:10.5px;padding:2px 7px}
+.jdate{font-size:12px;color:var(--soft);white-space:nowrap}
+.jtag{font-weight:600;font-size:14px;margin-bottom:5px}
+.jtag em{font-style:normal;color:var(--soft);font-weight:400}
+.jtext{font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.jphotos{display:flex;gap:8px;overflow-x:auto;margin-top:11px;scrollbar-width:none}
+.jphotos::-webkit-scrollbar{display:none}
+.jphotos img{flex:0 0 auto;width:132px;height:132px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:pointer;background:#e4e3d5}
+.jaudio{margin-top:11px;width:100%;height:38px}
+.del{background:none;border:none;color:var(--soft);font-size:11px;cursor:pointer;text-decoration:underline;opacity:.7;padding:0;margin-top:9px}
+
+/* compact log */
+.tl{list-style:none;margin:0;padding:0}
+.tl-month{font-family:'Fraunces',serif;font-size:15px;color:var(--soft);margin:16px 0 9px}
+.tl-item{display:flex;gap:11px;margin-bottom:11px}
+.tl-dot{flex:0 0 auto;width:11px;height:11px;border-radius:50%;margin-top:15px;box-shadow:0 0 0 3px var(--paper)}
+.tl-card{flex:1;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+.tl-detail{font-size:14px;color:var(--ink);line-height:1.5;margin:6px 0 0;white-space:pre-wrap}
+.tl-thumbs{display:flex;gap:6px;margin-top:8px}
+.tl-thumbs img{width:46px;height:46px;object-fit:cover;border-radius:6px;cursor:pointer;background:#e4e3d5}
+
+/* map */
+.maptools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.chip{background:var(--card);border:1px solid var(--line);font:inherit;font-size:13px;font-weight:500;color:var(--ink);padding:8px 14px;border-radius:20px;cursor:pointer}
+.chip.active{background:var(--ochre);border-color:var(--ochre);color:#241a06}
+.chip.ghost{color:var(--soft)}
+.chiprow{display:flex;flex-wrap:wrap;gap:8px}
+.map{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);line-height:0}
+.map.placing{cursor:crosshair;outline:2px dashed var(--ochre);outline-offset:-2px}
+.map img{width:100%;height:auto;display:block}
+.pin{position:absolute;transform:translate(-50%,-100%);background:none;border:none;cursor:pointer;padding:0}
+.pin::after{content:'';position:absolute;left:50%;bottom:-5px;width:9px;height:9px;transform:translateX(-50%) rotate(45deg);background:var(--green)}
+.pin-tag{display:inline-flex;align-items:center;gap:6px;background:var(--green);color:#F6F5EC;font-size:12px;font-weight:600;padding:5px 9px;border-radius:6px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.28)}
+.pin-tag em{font-style:normal;background:var(--ochre);color:#241a06;border-radius:9px;padding:0 6px;font-size:11px}
+
+/* plants */
+.plantgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.packet{position:relative;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 12px 13px;cursor:pointer;font:inherit}
+.packet-notch{position:absolute;top:0;left:14px;right:14px;height:6px;background:repeating-linear-gradient(90deg,var(--line) 0 5px,transparent 5px 10px)}
+.packet-thumb{width:100%;height:88px;object-fit:cover;border-radius:6px;margin:4px 0 9px;display:block;background:#e4e3d5}
+.packet-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:30px}
+.packet-name{font-family:'Fraunces',serif;font-size:18px;line-height:1.1}
+.packet-sub{font-size:12px;color:var(--soft);margin-top:3px}
+.pd-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}
+.pd-packet{width:104px;height:104px;object-fit:cover;border-radius:10px;flex:0 0 auto;border:1px solid var(--line);background:#e4e3d5}
+.pd-packet.ph{display:flex;align-items:center;justify-content:center;font-size:40px}
+.pd-sub{font-size:13px;color:var(--soft);margin-top:3px}
+.pd-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.wishtag{display:inline-block;background:var(--ochre);color:#241a06;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:12px;margin-bottom:6px}
+.caresheet{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.carerow{display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.carerow:last-child{border-bottom:none}
+.carek{flex:0 0 116px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--soft);font-weight:600;padding-top:2px}
+.carev{flex:1;font-size:14px;line-height:1.5}
+.pd-sec{margin-top:22px}
+.photorow{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.photorow::-webkit-scrollbar{display:none}
+.photorow img{flex:0 0 auto;width:120px;height:120px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid var(--line);background:#e4e3d5}
+
+/* photos wall */
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.wallcell{position:relative;padding:0;border:none;background:none;cursor:pointer;aspect-ratio:1}
+.wallcell img{width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid var(--line);background:#e4e3d5}
+.wallcap{position:absolute;left:0;right:0;bottom:0;font-size:10.5px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.6));padding:12px 7px 5px;border-radius:0 0 9px 9px;text-align:left;line-height:1.2}
+
+/* plan */
+.plansec{margin-bottom:24px}
+.addrow{display:flex;gap:8px;margin-bottom:12px}
+.inline{flex:1;font:inherit;font-size:14px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--ink)}
+.inline:focus{outline:none;border-color:var(--green)}
+.supplies{list-style:none;margin:0;padding:0}
+.supplies li{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.supplies li>span{flex:1;cursor:pointer}
+.supplies li.done>span{text-decoration:line-through;color:var(--soft)}
+.checkbox{width:22px;height:22px;flex:0 0 auto;border:1.5px solid var(--green);border-radius:6px;background:var(--paper);color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.aboutcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;font-size:13.5px;line-height:1.6;color:var(--soft)}
+.aboutcard b{color:var(--ink)}
+
+/* nav */
+.nav{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+.navb{flex:1;background:none;border:none;font:inherit;color:var(--soft);padding:9px 0 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.navb span{font-size:10px;font-weight:500}
+.navb.on{color:var(--green-d)}
+.navb svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.navb.on svg{fill:rgba(56,88,63,.12)}
+
+/* modals */
+.scrim{position:fixed;inset:0;background:rgba(23,27,20,.42);display:flex;align-items:flex-end;justify-content:center;z-index:50;animation:fade .2s ease}
+.scrim.dark{background:rgba(15,17,13,.85);align-items:center}
+.sheet{background:var(--paper);width:100%;max-width:560px;max-height:92vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:10px 18px calc(26px + env(safe-area-inset-bottom));animation:rise .26s cubic-bezier(.2,.7,.3,1)}
+@keyframes rise{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:2px auto 14px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sheet-title{font-family:'Fraunces',serif;font-weight:500;font-size:23px;margin:0}
+.x{background:var(--card);border:1px solid var(--line);width:30px;height:30px;border-radius:50%;cursor:pointer;color:var(--soft);font-size:13px;flex:0 0 auto}
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);font-weight:600;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green)}
+.field textarea{resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.formbtns{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+.deletebed{display:block;margin:22px auto 0;background:none;border:none;color:var(--brick);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}
+
+/* mic + audio in form */
+.microw{display:flex;align-items:center;gap:10px;margin:2px 0 10px}
+.micbtn{flex:0 0 auto;width:48px;height:48px;border-radius:50%;border:none;background:var(--green);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.micbtn svg{width:22px;height:22px;fill:currentColor}
+.micbtn.rec{background:var(--brick);animation:mpulse 1s ease-in-out infinite}
+@keyframes mpulse{0%,100%{box-shadow:0 0 0 0 rgba(158,74,44,.5)}50%{box-shadow:0 0 0 10px rgba(158,74,44,0)}}
+.michint{font-size:12.5px;color:var(--soft);line-height:1.4}
+.thumbstrip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 12px;scrollbar-width:none}
+.thumbstrip::-webkit-scrollbar{display:none}
+.thumbstrip img{flex:0 0 auto;width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.thumbwrap{position:relative;flex:0 0 auto}
+.thumbwrap .thumbx{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--brick);color:#fff;border:2px solid var(--paper);font-size:11px;cursor:pointer;line-height:1}
+.attachrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.attachbtn{background:var(--card);border:1px dashed var(--line);border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;color:var(--soft);cursor:pointer}
+.memobox{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:12px}
+.memobox audio{flex:1;height:34px}
+
+/* viewer */
+.viewer{position:relative;max-width:520px;width:92%}
+.viewer img{width:100%;max-height:70vh;object-fit:contain;border-radius:10px;display:block;background:#111}
+.viewer .x{position:absolute;top:-42px;right:0;background:rgba(255,255,255,.15);border-color:transparent;color:#fff}
+.viewer-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:#EDECE0;font-size:13px;margin-top:12px}
+.viewer-detail{color:#cfcdc0;font-size:14px;line-height:1.5;margin:8px 0 0;white-space:pre-wrap}
+
+/* install banner + toast */
+#install{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));max-width:696px;margin:0 auto;background:var(--green);color:#F6F5EC;border-radius:12px;padding:12px 14px;display:none;align-items:center;gap:10px;z-index:45;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+#install.show{display:flex}
+#install b{font-family:'Fraunces',serif;font-weight:500}
+#install .i-txt{flex:1;font-size:13px;line-height:1.35}
+#install button{border:none;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#install .i-go{background:#F6F5EC;color:var(--green-d)}
+#install .i-no{background:transparent;color:#F6F5EC;text-decoration:underline}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#F6F5EC;font-size:13px;padding:10px 16px;border-radius:20px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:88%;text-align:center}
+#toast.show{opacity:1}
+.skel{background:linear-gradient(100deg,#e4e3d5,#eeede2,#e4e3d5);background-size:200% 100%;animation:sh 1.3s ease infinite}
+@keyframes sh{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:420px){.title{font-size:31px}.stats{gap:11px}.stat-n{font-size:19px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="install">
+  <div class="i-txt"><b>Install The Garden</b><br>Add it to your home screen to open like an app, offline.</div>
+  <button class="i-go" data-action="install-go">Install</button>
+  <button class="i-no" data-action="install-no">Not now</button>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =============================================================
+ * The Garden — offline PWA. Vanilla JS + IndexedDB.
+ * ============================================================= */
+
+/* ---------- tiny helpers ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+const app = $("#app"), modalRoot = $("#modal-root");
+const uid = () => Math.random().toString(36).slice(2,10);
+const todayISO = () => new Date().toISOString().slice(0,10);
+const esc = (s="") => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = d => d ? new Date(d+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "";
+const monthKey = d => d ? new Date(d+"T00:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"}) : "Undated";
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+
+/* ---------- types ---------- */
+const TYPES = [
+  {t:"Diary note", c:"#38583F"},
+  {t:"Sowed seed", c:"#4E7A57"},
+  {t:"Planted", c:"#356B45"},
+  {t:"Transplanted", c:"#4E7A57"},
+  {t:"Fertilized", c:"#C6892F"},
+  {t:"Watered", c:"#3E7C86"},
+  {t:"Pruned", c:"#6B7256"},
+  {t:"Harvested", c:"#B4712A"},
+  {t:"Bloomed", c:"#9C5A7A"},
+  {t:"Pest / issue", c:"#9E4A2C"},
+  {t:"Photo", c:"#5A6350"},
+];
+const eColor = t => (TYPES.find(x=>x.t===t)||{c:"#5A6350"}).c;
+const KINDS=["Vegetable","Fruit","Herb","Flower"];
+const LIFE=["Annual","Perennial","Biennial","Tender perennial"];
+const SUN=["Full sun","Part sun","Part shade","Full shade"];
+const glyph = k => ({Vegetable:"🥬",Fruit:"🍓",Herb:"🌿",Flower:"🌸"}[k]||"🌱");
+
+/* ---------- IndexedDB ---------- */
+const STORES=["kv","beds","plants","entries","supplies","photos","audio"];
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("garden",1);
+  r.onupgradeneeded=e=>{const db=e.target.result;STORES.forEach(s=>{if(!db.objectStoreNames.contains(s))db.createObjectStore(s,{keyPath:s==="kv"?"k":"id"});});};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function dbAll(store){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(store).objectStore(store).getAll();rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
+async function dbGet(store,key){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(store).objectStore(store).get(key);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
+async function dbPut(store,val){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).put(val);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+async function dbDel(store,key){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+const kvGet=async k=>{const v=await dbGet("kv",k);return v?v.v:null;};
+const kvSet=(k,v)=>dbPut("kv",{k,v});
+
+/* ---------- blob storage + object URLs ---------- */
+const urlCache=new Map();
+async function blobURL(store,id){const key=store+":"+id;if(urlCache.has(key))return urlCache.get(key);
+  const rec=await dbGet(store,id);if(!rec||!rec.blob)return null;const u=URL.createObjectURL(rec.blob);urlCache.set(key,u);return u;}
+function compressToBlob(file,maxDim=1400,q=0.72){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);
+  img.onload=()=>{URL.revokeObjectURL(u);let{width:w,height:h}=img;if(w>=h&&w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;}else if(h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;}
+    const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);c.toBlob(b=>res(b),"image/jpeg",q);};
+  img.onerror=rej;img.src=u;});}
+async function storePhoto(file){const blob=await compressToBlob(file);const id=uid();await dbPut("photos",{id,blob});return id;}
+async function storeAudio(blob){const id=uid();await dbPut("audio",{id,blob});return id;}
+
+/* ---------- state ---------- */
+const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,journalView:"journal",logFilter:"All",plantSeg:"growing"};
+
+async function boot(){
+  const [beds,plants,entries,supplies,region,mapId]=await Promise.all([
+    dbAll("beds"),dbAll("plants"),dbAll("entries"),dbAll("supplies"),kvGet("region"),kvGet("mapId")]);
+  S.beds=beds||[];S.plants=plants||[];S.entries=entries||[];S.supplies=supplies||[];S.region=region||"";S.mapId=mapId||null;
+  render();
+}
+
+/* ---------- derived ---------- */
+const plantOf=id=>S.plants.find(p=>p.id===id);
+const bedOf=id=>S.beds.find(b=>b.id===id);
+const nameOf=e=>e.plantId?(plantOf(e.plantId)?.name||e.plantName||""):(e.plantName||"");
+const sortedEntries=()=>S.entries.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+const entriesForPlant=p=>S.entries.filter(e=>e.plantId===p.id||(e.plantName&&p.name&&e.plantName.toLowerCase()===p.name.toLowerCase()));
+const entriesForBed=id=>S.entries.filter(e=>e.bedId===id);
+const growing=()=>S.plants.filter(p=>p.status!=="wishlist");
+const wishlist=()=>S.plants.filter(p=>p.status==="wishlist");
+
+/* ---------- persistence wrappers ---------- */
+async function saveEntry(e){await dbPut("entries",e);const i=S.entries.findIndex(x=>x.id===e.id);if(i>=0)S.entries[i]=e;else S.entries.push(e);}
+async function removeEntry(id){const e=S.entries.find(x=>x.id===id);if(e){(e.photoIds||[]).forEach(pid=>{dbDel("photos",pid);urlCache.delete("photos:"+pid);});if(e.audioId)dbDel("audio",e.audioId);}await dbDel("entries",id);S.entries=S.entries.filter(x=>x.id!==id);}
+async function savePlant(p){await dbPut("plants",p);const i=S.plants.findIndex(x=>x.id===p.id);if(i>=0)S.plants[i]=p;else S.plants.push(p);}
+async function removePlant(id){const p=plantOf(id);if(p?.packetId){dbDel("photos",p.packetId);urlCache.delete("photos:"+p.packetId);}await dbDel("plants",id);S.plants=S.plants.filter(x=>x.id!==id);}
+async function saveBed(b){await dbPut("beds",b);const i=S.beds.findIndex(x=>x.id===b.id);if(i>=0)S.beds[i]=b;else S.beds.push(b);}
+async function removeBed(id){await dbDel("beds",id);S.beds=S.beds.filter(x=>x.id!==id);}
+async function saveSupply(s){await dbPut("supplies",s);const i=S.supplies.findIndex(x=>x.id===s.id);if(i>=0)S.supplies[i]=s;else S.supplies.push(s);}
+async function removeSupply(id){await dbDel("supplies",id);S.supplies=S.supplies.filter(x=>x.id!==id);}
+
+/* ============================================================
+ * RENDER
+ * ============================================================ */
+function render(){
+  if(S.tab==="diary")app.innerHTML=viewDiary();
+  else if(S.tab==="plants")app.innerHTML=S.openPlant?viewPlantDetail():viewPlants();
+  else if(S.tab==="plot")app.innerHTML=viewPlot();
+  else if(S.tab==="photos")app.innerHTML=viewPhotos();
+  else if(S.tab==="plan")app.innerHTML=viewPlan();
+  app.insertAdjacentHTML("beforeend",navBar());
+  hydrate();
+}
+
+function navBar(){
+  const items=[["diary","Diary",'<path d="M4 4h13a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-3 1.5V6a2 2 0 0 1 2-2z"/><line x1="8" y1="9" x2="15" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/>'],
+    ["plants","Plants",'<path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><line x1="5" y1="19" x2="14" y2="10"/>'],
+    ["plot","Plot",'<path d="M12 2C8.7 2 6 4.7 6 8c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z"/><circle cx="12" cy="8" r="2.1"/>'],
+    ["photos","Photos",'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-2.5h5L16 7"/><circle cx="12" cy="13" r="3"/>'],
+    ["plan","Plan",'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12.5l2.5 2.5 5-5.5"/>']];
+  return `<nav class="nav">${items.map(([id,label,svg])=>
+    `<button class="navb ${S.tab===id?"on":""}" data-action="tab" data-tab="${id}"><svg viewBox="0 0 24 24">${svg}</svg><span>${label}</span></button>`).join("")}</nav>`;
+}
+
+function screenHead(eyebrow,title,stats,action){
+  return `<header class="head"><div><div class="eyebrow">${eyebrow}</div><h1 class="title">${title}</h1></div>
+    ${stats?`<div class="stats">${stats.map(([n,l])=>`<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`).join("")}</div>`:""}
+    ${action?`<button class="btn sm" data-action="${action.a}">${action.label}</button>`:""}</header>`;
+}
+const emptyBox=(h,p,btn)=>`<div class="empty"><p class="empty-h">${h}</p><p class="empty-p">${p}</p>${btn?`<button class="btn" data-action="${btn.a}">${btn.label}</button>`:""}</div>`;
+
+/* ---------------- DIARY ---------------- */
+function viewDiary(){
+  const entries=sortedEntries();
+  let body="";
+  body+=`<div class="capture">
+    <button class="bigmic" data-action="new-entry" aria-label="New voice entry"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="capture-txt" data-action="new-entry"><b>New entry</b><span>Speak it or type it — add photos too</span></div>
+  </div>`;
+  body+=`<div class="seg">
+    <button class="segb ${S.journalView==="journal"?"on":""}" data-action="jview" data-v="journal">Journal</button>
+    <button class="segb ${S.journalView==="log"?"on":""}" data-action="jview" data-v="log">Log</button></div>`;
+
+  if(!entries.length){body+=emptyBox("Your journal is empty","Tap the mic to talk through what you did today, or type a note. Everything you add flows into the timeline and onto each plant's page.",{a:"new-entry",label:"＋ Add first entry"});}
+  else if(S.journalView==="journal"){
+    body+=entries.map(e=>{const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
+      return `<article class="jcard">
+        <div class="jcard-top"><span class="badge" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>
+        ${(nm||bd)?`<div class="jtag">${esc(nm)}${bd?` <em>· ${esc(bd.name)}</em>`:""}</div>`:""}
+        ${e.text?`<div class="jtext">${esc(e.text)}</div>`:""}
+        ${(e.photoIds&&e.photoIds.length)?`<div class="jphotos">${e.photoIds.map(pid=>`<img data-photo="${pid}" data-action="view" data-eid="${e.id}" alt="">`).join("")}</div>`:""}
+        ${e.audioId?`<audio class="jaudio" controls data-audio="${e.audioId}"></audio>`:""}
+        <button class="del" data-action="del-entry" data-id="${e.id}">remove</button>
+      </article>`;}).join("");
+  } else {
+    body+=`<div class="filterrow">${["All",...TYPES.map(t=>t.t)].map(t=>`<button class="fchip ${S.logFilter===t?"on":""}" ${S.logFilter===t&&t!=="All"?`style="background:${eColor(t)};border-color:${eColor(t)};color:#fff"`:""} data-action="lfilter" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
+    const rows=S.logFilter==="All"?entries:entries.filter(e=>e.type===S.logFilter);
+    let lm=null;body+=`<ul class="tl">`;
+    rows.forEach(e=>{const mk=monthKey(e.date);if(mk!==lm){body+=`<li class="tl-month">${mk}</li>`;lm=mk;}const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
+      body+=`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card">
+        <div class="jcard-top"><span class="badge" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>
+        ${(nm||bd)?`<div class="jtag">${esc(nm)}${bd?` <em>· ${esc(bd.name)}</em>`:""}</div>`:""}
+        ${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}
+        ${(e.photoIds&&e.photoIds.length)?`<div class="tl-thumbs">${e.photoIds.map(pid=>`<img data-photo="${pid}" data-action="view" data-eid="${e.id}" alt="">`).join("")}</div>`:""}
+        <button class="del" data-action="del-entry" data-id="${e.id}">remove</button></div></li>`;});
+    body+=`</ul>`;
+  }
+  return `<div class="screen">${screenHead("Voice & written","Diary",[[S.entries.length,"entries"],[growing().length,"growing"]])}${body}</div>`;
+}
+
+/* ---------------- PLANTS ---------------- */
+function viewPlants(){
+  const list=S.plantSeg==="growing"?growing():wishlist();
+  let body=`<div class="seg">
+    <button class="segb ${S.plantSeg==="growing"?"on":""}" data-action="pseg" data-v="growing">Growing (${growing().length})</button>
+    <button class="segb ${S.plantSeg==="wishlist"?"on":""}" data-action="pseg" data-v="wishlist">Try next (${wishlist().length})</button></div>`;
+  if(!list.length){
+    body+=S.plantSeg==="growing"
+      ?emptyBox("No plant pages yet","Add a plant to keep its care page — annual or perennial, when and how to plant, watering, feeding — plus its own photos and log.",{a:"new-plant",label:"＋ Add plant"})
+      :emptyBox("Nothing on the try-next list","Keep flowers or veggies you'd like to grow, with the same care page.",{a:"new-wish",label:"＋ Add to try next"});
+  } else {
+    body+=`<div class="plantgrid">${list.map(p=>`<button class="packet" data-action="open-plant" data-id="${p.id}"><span class="packet-notch"></span>
+      ${p.packetId?`<img class="packet-thumb" data-photo="${p.packetId}" alt="">`:`<div class="packet-thumb ph">${glyph(p.kind)}</div>`}
+      <div class="packet-name">${esc(p.name||"Untitled")}</div>
+      <div class="packet-sub">${esc([p.kind,p.lifecycle].filter(Boolean).join(" · ")||"—")}</div></button>`).join("")}</div>`;
+  }
+  return `<div class="screen">${screenHead("A care page for each","Plants",null,{a:S.plantSeg==="wishlist"?"new-wish":"new-plant",label:"＋ Add plant"})}${body}</div>`;
+}
+function viewPlantDetail(){
+  const p=plantOf(S.openPlant);if(!p){S.openPlant=null;return viewPlants();}
+  const rows=[["Type",[p.kind,p.lifecycle].filter(Boolean).join(" · ")],["Sun",p.sun],["When to plant",p.whenToPlant],["How to plant",p.howToPlant],["Spacing",p.spacing],["Days to maturity",p.daysToMaturity],["Watering",p.watering],["Fertilizing",p.fertilizing],["Bulb / seed info",p.bulbInfo],["Source",p.source],["Care notes",p.careNotes]].filter(r=>r[1]);
+  const evs=entriesForPlant(p).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const photos=evs.filter(e=>e.photoIds&&e.photoIds.length).flatMap(e=>e.photoIds.map(pid=>({pid,eid:e.id})));
+  return `<div class="screen"><button class="back" data-action="close-plant">‹ Plants</button>
+    <div class="pd-head">${p.packetId?`<img class="pd-packet" data-photo="${p.packetId}" alt="">`:`<div class="pd-packet ph">${glyph(p.kind)}</div>`}
+      <div>${p.status==="wishlist"?`<span class="wishtag">Try next</span>`:""}<h1 class="title sm">${esc(p.name)}</h1>
+      <div class="pd-sub">${esc([p.kind,p.lifecycle].filter(Boolean).join(" · "))}</div>
+      <div class="pd-actions"><button class="btn xs" data-action="log-for-plant" data-id="${p.id}">＋ Log</button>
+      <button class="btn xs ghost" data-action="edit-plant" data-id="${p.id}">Edit</button>
+      ${p.status==="wishlist"?`<button class="btn xs" data-action="move-growing" data-id="${p.id}">Move to growing</button>`:""}</div></div></div>
+    ${rows.length?`<div class="caresheet">${rows.map(([k,v])=>`<div class="carerow"><span class="carek">${k}</span><span class="carev">${esc(v)}</span></div>`).join("")}</div>`:emptyBox("No care details yet","Tap Edit to fill in how to care for this one.")}
+    ${photos.length?`<div class="pd-sec"><div class="sublabel">Progress</div><div class="photorow">${photos.map(x=>`<img data-photo="${x.pid}" data-action="view" data-eid="${x.eid}" alt="">`).join("")}</div></div>`:""}
+    <div class="pd-sec"><div class="sublabel">This plant's log</div>
+    ${evs.length?`<ul class="tl">${evs.map(e=>`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card"><div class="jcard-top"><span class="badge sm" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="muted">Nothing logged for this plant yet.</p>`}</div>
+    <button class="deletebed" data-action="del-plant" data-id="${p.id}">Delete this plant page</button></div>`;
+}
+
+/* ---------------- PLOT ---------------- */
+function viewPlot(){
+  let body;
+  if(!S.mapId){
+    body=`<div class="empty"><p class="empty-h">Add a photo of your plot</p><p class="empty-p">An overhead shot works best. Drop a tag on each bed, then any entry can point back to it.</p>
+      <button class="btn" data-action="pick-map">Add plot photo</button><button class="linkbtn" style="margin:12px auto 0" data-action="add-bed">or add a bed without a photo</button></div>`;
+  } else {
+    const off=S.beds.filter(b=>b.x==null);
+    body=`<div class="maptools">
+      <button class="chip ${window.__placing?"active":""}" data-action="toggle-place">${window.__placing?"Tap the plot to drop a tag…":"＋ Tag a bed"}</button>
+      <button class="chip ghost" data-action="add-bed">＋ Bed (no map)</button>
+      <button class="chip ghost" data-action="pick-map">Replace photo</button></div>
+      <div class="map ${window.__placing?"placing":""}" data-action="map-click"><img data-photo-map="${S.mapId}" alt="Your plot">
+      ${S.beds.filter(b=>b.x!=null).map(b=>`<button class="pin" style="left:${b.x}%;top:${b.y}%" data-action="open-bed" data-id="${b.id}"><span class="pin-tag">${esc(b.name)}${entriesForBed(b.id).length?`<em>${entriesForBed(b.id).length}</em>`:""}</span></button>`).join("")}</div>
+      ${off.length?`<div class="pd-sec"><div class="sublabel">Beds not on the map</div><div class="chiprow">${off.map(b=>`<button class="chip" data-action="open-bed" data-id="${b.id}">${esc(b.name)}</button>`).join("")}</div></div>`:""}`;
+  }
+  return `<div class="screen">${screenHead("Map & beds","Plot",[[S.beds.length,"beds"]])}${body}</div>`;
+}
+
+/* ---------------- PHOTOS ---------------- */
+function viewPhotos(){
+  const items=sortedEntries().filter(e=>e.photoIds&&e.photoIds.length).flatMap(e=>e.photoIds.map(pid=>({pid,e})));
+  const body=items.length?`<div class="wall">${items.map(x=>`<button class="wallcell" data-action="view" data-eid="${x.e.id}" data-photo-pick="${x.pid}"><img data-photo="${x.pid}" alt=""><span class="wallcap">${fmt(x.e.date)}${nameOf(x.e)?" · "+esc(nameOf(x.e)):""}</span></button>`).join("")}</div>`
+    :emptyBox("No photos yet","Attach photos to any diary entry, or tap ＋ Photo for a quick progress shot. They gather here newest-first.",{a:"new-photo",label:"＋ Photo"});
+  return `<div class="screen">${screenHead("Pictures over time","Progress",null,{a:"new-photo",label:"＋ Photo"})}${body}</div>`;
+}
+
+/* ---------------- PLAN ---------------- */
+function viewPlan(){
+  const wl=wishlist();
+  const supl=S.supplies.slice();
+  const iosStandalone = ("standalone" in navigator) && navigator.standalone;
+  return `<div class="screen">${screenHead("Needs, wishlist, about","Plan")}
+    <div class="plansec"><div class="sublabel">Things I need</div>
+    <div class="addrow"><input class="inline" id="supinput" placeholder="Compost, tomato cages, drip line…"><button class="btn sm" data-action="add-supply">Add</button></div>
+    ${supl.length?`<ul class="supplies">${supl.map(s=>`<li class="${s.done?"done":""}"><button class="checkbox" data-action="toggle-supply" data-id="${s.id}">${s.done?"✓":""}</button><span data-action="toggle-supply" data-id="${s.id}">${esc(s.text)}</span><button class="del" style="text-decoration:none;font-size:18px" data-action="del-supply" data-id="${s.id}">×</button></li>`).join("")}</ul>`:`<p class="muted">Nothing on the list.</p>`}</div>
+    <div class="plansec"><div class="sublabel-row"><div class="sublabel">Try next</div><button class="linkbtn" data-action="new-wish">＋ Add</button></div>
+    ${wl.length?`<div class="chiprow">${wl.map(p=>`<button class="chip" data-action="open-plant" data-id="${p.id}">${esc(p.name)}</button>`).join("")}</div>`:`<p class="muted">No wishlist plants yet.</p>`}</div>
+    <div class="plansec"><div class="sublabel">Region / zone</div>
+    <input class="inline" style="width:100%" id="regioninput" value="${esc(S.region)}" placeholder="e.g. USDA 6a, Indiana" data-action="region-blur"></div>
+    <div class="plansec"><div class="sublabel">About & install</div>
+    <div class="aboutcard"><b>The Garden</b> stores everything on this device, in your browser — it works offline and nothing is uploaded.
+    ${iosStandalone?" It's installed. ":" To install on iPhone: open in Safari, tap Share, then <b>Add to Home Screen</b>. On Android/desktop Chrome, use the install prompt or the browser menu."}
+    Back up by keeping this app installed; clearing site data erases entries.</div></div>
+  </div>`;
+}
+
+/* ---------- hydrate images/audio + focus ---------- */
+async function hydrate(){
+  for(const img of app.querySelectorAll("[data-photo]")){const id=img.getAttribute("data-photo");const u=await blobURL("photos",id);if(u)img.src=u;else img.classList.add("skel");}
+  for(const img of app.querySelectorAll("[data-photo-map]")){const id=img.getAttribute("data-photo-map");const u=await blobURL("photos",id);if(u)img.src=u;}
+  for(const a of app.querySelectorAll("[data-audio]")){const id=a.getAttribute("data-audio");const u=await blobURL("audio",id);if(u)a.src=u;}
+  const rin=$("#regioninput");if(rin)rin.addEventListener("change",async e=>{S.region=e.target.value;await kvSet("region",S.region);});
+  const sin=$("#supinput");if(sin)sin.addEventListener("keydown",e=>{if(e.key==="Enter")addSupplyFromInput();});
+}
+
+/* ============================================================
+ * ENTRY FORM (voice + text + photos + audio memo)
+ * ============================================================ */
+let draft=null; let rec=null; let mediaRec=null; let recStream=null;
+function openEntryForm(opts={}){
+  draft={id:uid(),createdAt:Date.now(),type:opts.type||"Diary note",date:todayISO(),text:"",plantName:opts.plantName||"",plantId:opts.plantId||null,bedId:opts.bedId||"",photoIds:[],audioId:null};
+  if(opts.plantId){const p=plantOf(opts.plantId);if(p){draft.plantName=p.name;draft.plantId=p.id;}}
+  renderEntryForm();
+}
+function renderEntryForm(){
+  const typeOpts=TYPES.map(t=>`<option ${draft.type===t.t?"selected":""}>${t.t}</option>`).join("");
+  const bedOpts=`<option value="">— none —</option>`+S.beds.map(b=>`<option value="${b.id}" ${draft.bedId===b.id?"selected":""}>${esc(b.name)}</option>`).join("");
+  const plantDatalist=S.plants.map(p=>`<option value="${esc(p.name)}">`).join("");
+  const thumbs=draft.photoIds.map(pid=>`<span class="thumbwrap"><img data-photo="${pid}" alt=""><button class="thumbx" data-action="rm-photo" data-id="${pid}">×</button></span>`).join("");
+  const srAvailable = ("webkitSpeechRecognition" in window)||("SpeechRecognition" in window);
+  modalRoot.innerHTML=`<div class="scrim" data-action="close-modal"><div class="sheet" data-stop>
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 class="sheet-title">New entry</h2><button class="x" data-action="close-modal">✕</button></div>
+    <div class="microw"><button class="micbtn ${rec?"rec":""}" data-action="dictate"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <div class="michint">${srAvailable?(rec?"Listening… tap to stop":"Tap and speak — words fill the note below"):"Live dictation isn't available in this browser. Tap the note field and use your keyboard's mic, or record a voice memo below."}</div></div>
+    <label class="field"><span>Note</span><textarea id="entrytext" rows="4" placeholder="What happened? Speak or type…">${esc(draft.text)}</textarea></label>
+    <div class="attachrow"><button class="attachbtn" data-action="pick-photos">＋ Add photos</button>
+      <button class="attachbtn" data-action="memo-toggle">${mediaRec&&mediaRec.state==="recording"?"■ Stop voice memo":"🎙 Voice memo"}</button></div>
+    ${thumbs?`<div class="thumbstrip">${thumbs}</div>`:""}
+    ${draft.audioId?`<div class="memobox"><audio controls data-audio="${draft.audioId}"></audio><button class="del" style="margin:0" data-action="rm-memo">remove</button></div>`:""}
+    <label class="field"><span>Type</span><select id="entrytype">${typeOpts}</select></label>
+    <div class="row"><label class="field"><span>When</span><input type="date" id="entrydate" value="${draft.date}"></label>
+      <label class="field"><span>Bed</span><select id="entrybed">${bedOpts}</select></label></div>
+    <label class="field"><span>Plant</span><input id="entryplant" list="plantlist" value="${esc(draft.plantName)}" placeholder="Type or pick — links to a plant page if it exists"><datalist id="plantlist">${plantDatalist}</datalist></label>
+    <div class="formbtns"><button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn" data-action="save-entry">Save entry</button></div>
+  </div></div>`;
+  hydrateModal();
+  const ta=$("#entrytext");if(ta){ta.addEventListener("input",e=>draft.text=e.target.value);}
+  $("#entrytype")?.addEventListener("change",e=>draft.type=e.target.value);
+  $("#entrydate")?.addEventListener("change",e=>draft.date=e.target.value);
+  $("#entrybed")?.addEventListener("change",e=>draft.bedId=e.target.value);
+  $("#entryplant")?.addEventListener("input",e=>draft.plantName=e.target.value);
+}
+async function hydrateModal(){
+  for(const img of modalRoot.querySelectorAll("[data-photo]")){const id=img.getAttribute("data-photo");const u=await blobURL("photos",id);if(u)img.src=u;}
+  for(const a of modalRoot.querySelectorAll("[data-audio]")){const id=a.getAttribute("data-audio");const u=await blobURL("audio",id);if(u)a.src=u;}
+}
+function closeModal(){stopDictation();stopMemo(true);modalRoot.innerHTML="";draft=null;}
+
+/* dictation */
+function toggleDictate(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast("Live dictation not supported here — use your keyboard mic.");return;}
+  if(rec){stopDictation();renderEntryForm();return;}
+  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-US";
+  let base=(draft.text||"").trim();
+  rec.onresult=e=>{let interim="",fin="";for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript;}
+    if(fin)base=(base+" "+fin).trim();const combined=(base+" "+interim).trim();draft.text=combined;const ta=$("#entrytext");if(ta)ta.value=combined;};
+  rec.onerror=ev=>{if(ev.error==="not-allowed")toast("Microphone permission needed.");};
+  rec.onend=()=>{rec=null;const b=modalRoot.querySelector(".micbtn");if(b)b.classList.remove("rec");};
+  try{rec.start();}catch(_){}
+  renderEntryForm();
+}
+function stopDictation(){if(rec){try{rec.stop();}catch(_){}rec=null;}}
+
+/* voice memo */
+async function toggleMemo(){
+  if(mediaRec&&mediaRec.state==="recording"){stopMemo();return;}
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:true});}
+  catch(_){toast("Microphone permission needed.");return;}
+  let chunks=[];mediaRec=new MediaRecorder(recStream);
+  mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+  mediaRec.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRec.mimeType||"audio/webm"});if(recStream){recStream.getTracks().forEach(t=>t.stop());recStream=null;}
+    if(blob.size){if(draft.audioId){dbDel("audio",draft.audioId);urlCache.delete("audio:"+draft.audioId);}draft.audioId=await storeAudio(blob);}renderEntryForm();};
+  mediaRec.start();renderEntryForm();
+}
+function stopMemo(silent){if(mediaRec&&mediaRec.state==="recording"){if(silent)mediaRec.onstop=()=>{if(recStream){recStream.getTracks().forEach(t=>t.stop());recStream=null;}};try{mediaRec.stop();}catch(_){}mediaRec=null;}}
+
+async function saveDraftEntry(){
+  stopDictation();stopMemo(true);
+  const text=(draft.text||"").trim();
+  if(!text&&!(draft.photoIds.length)&&!draft.audioId){toast("Add a note, photo, or voice memo first.");return;}
+  const match=S.plants.find(p=>p.name&&draft.plantName&&p.name.toLowerCase()===draft.plantName.trim().toLowerCase());
+  const entry={id:draft.id,createdAt:draft.createdAt,type:draft.type,date:draft.date,text,
+    plantId:match?match.id:null,plantName:match?null:(draft.plantName.trim()||null),
+    bedId:draft.bedId||null,photoIds:draft.photoIds,audioId:draft.audioId};
+  await saveEntry(entry);modalRoot.innerHTML="";draft=null;render();toast("Saved");
+}
+
+/* ============================================================
+ * PLANT FORM
+ * ============================================================ */
+let pdraft=null;
+function openPlantForm(opts={}){
+  const p=opts.plant;
+  pdraft=p?{...p}:{id:uid(),status:opts.status||"growing",kind:"Vegetable",name:"",lifecycle:"",sun:"",whenToPlant:"",howToPlant:"",spacing:"",daysToMaturity:"",watering:"",fertilizing:"",bulbInfo:"",source:"",careNotes:"",packetId:null};
+  renderPlantForm();
+}
+function renderPlantForm(){
+  const f=pdraft;
+  const sel=(arr,val,ph)=>`<option value="">${ph||"—"}</option>`+arr.map(o=>`<option ${val===o?"selected":""}>${o}</option>`).join("");
+  modalRoot.innerHTML=`<div class="scrim" data-action="close-pmodal"><div class="sheet" data-stop>
+    <div class="grab"></div><div class="sheet-head"><h2 class="sheet-title">${f.id&&S.plants.some(x=>x.id===f.id)?"Edit plant":"New plant"}</h2><button class="x" data-action="close-pmodal">✕</button></div>
+    <div style="text-align:center;margin-bottom:14px">${f.packetId?`<img data-photo="${f.packetId}" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;border:1px solid var(--line)" alt="">`:""}
+      <button class="attachbtn" style="width:100%;margin-top:${f.packetId?"8px":"0"}" data-action="pick-packet">${f.packetId?"Change seed packet / plant photo":"＋ Seed packet / plant photo"}</button></div>
+    <label class="field"><span>Name</span><input id="pf-name" value="${esc(f.name)}" placeholder="Sungold tomato, Music garlic, moso bamboo…"></label>
+    <div class="row"><label class="field"><span>Kind</span><select id="pf-kind">${KINDS.map(k=>`<option ${f.kind===k?"selected":""}>${k}</option>`).join("")}</select></label>
+      <label class="field"><span>Lifecycle</span><select id="pf-life">${sel(LIFE,f.lifecycle)}</select></label></div>
+    <div class="row"><label class="field"><span>Sun</span><select id="pf-sun">${sel(SUN,f.sun)}</select></label>
+      <label class="field"><span>Days to maturity</span><input id="pf-dtm" value="${esc(f.daysToMaturity)}" placeholder="65 days"></label></div>
+    <label class="field"><span>When to plant</span><input id="pf-when" value="${esc(f.whenToPlant)}" placeholder="After last frost, mid-May"></label>
+    <label class="field"><span>How to plant</span><textarea id="pf-how" rows="2" placeholder="Depth, starting method, hardening off…">${esc(f.howToPlant)}</textarea></label>
+    <div class="row"><label class="field"><span>Spacing</span><input id="pf-space" value="${esc(f.spacing)}" placeholder='18&quot; apart'></label>
+      <label class="field"><span>Watering</span><input id="pf-water" value="${esc(f.watering)}" placeholder="1in / week"></label></div>
+    <label class="field"><span>Fertilizing</span><input id="pf-fert" value="${esc(f.fertilizing)}" placeholder="Balanced feed every 3 weeks…"></label>
+    <label class="field"><span>Bulb / seed info</span><textarea id="pf-bulb" rows="2" placeholder="Bulb size, planting depth, chill needs, seed source…">${esc(f.bulbInfo)}</textarea></label>
+    <label class="field"><span>Source</span><input id="pf-src" value="${esc(f.source)}" placeholder="Where you bought it"></label>
+    <label class="field"><span>Care notes</span><textarea id="pf-notes" rows="3" placeholder="Anything else worth remembering…">${esc(f.careNotes)}</textarea></label>
+    <div class="formbtns"><button class="btn ghost" data-action="close-pmodal">Cancel</button><button class="btn" data-action="save-plant">Save plant</button></div>
+  </div></div>`;
+  hydrateModal();
+}
+function collectPlant(){const g=id=>$(id)?.value||"";
+  pdraft.name=g("#pf-name").trim();pdraft.kind=g("#pf-kind");pdraft.lifecycle=g("#pf-life");pdraft.sun=g("#pf-sun");
+  pdraft.daysToMaturity=g("#pf-dtm");pdraft.whenToPlant=g("#pf-when");pdraft.howToPlant=g("#pf-how");pdraft.spacing=g("#pf-space");
+  pdraft.watering=g("#pf-water");pdraft.fertilizing=g("#pf-fert");pdraft.bulbInfo=g("#pf-bulb");pdraft.source=g("#pf-src");pdraft.careNotes=g("#pf-notes");}
+async function saveDraftPlant(){collectPlant();if(!pdraft.name){toast("Give the plant a name.");return;}await savePlant(pdraft);modalRoot.innerHTML="";const id=pdraft.id;pdraft=null;render();toast("Saved");}
+
+/* ============================================================
+ * BED SHEET
+ * ============================================================ */
+function openBedSheet(id){
+  const b=bedOf(id);if(!b)return;
+  const evs=entriesForBed(id).slice().sort((a,b2)=>(b2.date||"").localeCompare(a.date||""));
+  modalRoot.innerHTML=`<div class="scrim" data-action="close-modal2"><div class="sheet" data-stop>
+    <div class="grab"></div><div class="sheet-head"><input id="bedname" value="${esc(b.name)}" style="font-family:'Fraunces',serif;font-size:22px;border:none;border-bottom:2px solid var(--green);background:none;padding:2px 0;width:70%"><button class="x" data-action="close-modal2">✕</button></div>
+    <button class="btn wide" style="margin-bottom:14px" data-action="log-for-bed" data-id="${id}">＋ Log in this bed</button>
+    ${evs.length?`<ul class="tl">${evs.map(e=>`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card"><div class="jcard-top"><span class="badge sm" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>${nameOf(e)?`<div class="jtag">${esc(nameOf(e))}</div>`:""}${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="muted" style="text-align:center;padding:12px">Nothing logged in this bed yet.</p>`}
+    <button class="deletebed" data-action="del-bed" data-id="${id}">Delete this bed</button>
+  </div></div>`;
+  $("#bedname")?.addEventListener("change",async e=>{b.name=e.target.value.trim()||b.name;await saveBed(b);});
+}
+
+/* ============================================================
+ * PHOTO VIEWER
+ * ============================================================ */
+async function openViewer(eid,pid){
+  const e=S.entries.find(x=>x.id===eid);if(!e)return;
+  const nm=nameOf(e),bd=e.bedId&&bedOf(e.bedId);
+  modalRoot.innerHTML=`<div class="scrim dark" data-action="close-modal2"><div class="viewer" data-stop>
+    <button class="x" data-action="close-modal2">✕</button><img id="vimg" alt="">
+    <div class="viewer-meta"><span class="badge" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span>${fmt(e.date)}</span>${nm?`<span>· ${esc(nm)}</span>`:""}${bd?`<span>· ${esc(bd.name)}</span>`:""}</div>
+    ${e.text?`<p class="viewer-detail">${esc(e.text)}</p>`:""}</div></div>`;
+  const u=await blobURL("photos",pid||e.photoIds[0]);if(u)$("#vimg").src=u;
+}
+
+/* ============================================================
+ * FILE PICKERS
+ * ============================================================ */
+function pickFiles(multiple,cb){const inp=document.createElement("input");inp.type="file";inp.accept="image/*";if(multiple)inp.multiple=true;
+  inp.onchange=async()=>{for(const f of inp.files)await cb(f);};inp.click();}
+function pickMap(){pickFiles(false,async f=>{const blob=await compressToBlob(f,1600,0.72);const id=uid();await dbPut("photos",{id,blob});if(S.mapId){dbDel("photos",S.mapId);urlCache.delete("photos:"+S.mapId);}S.mapId=id;await kvSet("mapId",id);render();});}
+
+function addSupplyFromInput(){const inp=$("#supinput");const v=(inp?.value||"").trim();if(!v)return;saveSupply({id:uid(),text:v,done:false}).then(()=>render());}
+
+/* ============================================================
+ * EVENT DELEGATION
+ * ============================================================ */
+document.addEventListener("click",async ev=>{
+  const t=ev.target.closest("[data-action]");if(!t)return;
+  const a=t.getAttribute("data-action");const id=t.getAttribute("data-id");
+
+  // close only on true backdrop tap (on the scrim itself) or on ✕/Cancel buttons
+  if(a==="close-modal"||a==="close-pmodal"||a==="close-modal2"){
+    if(t.classList.contains("scrim")&&ev.target!==t)return; // tapped empty space inside the sheet
+    if(a==="close-modal")closeModal();
+    else{stopDictation();stopMemo(true);modalRoot.innerHTML="";pdraft=null;}
+    return;
+  }
+
+  switch(a){
+    case "tab": S.tab=t.getAttribute("data-tab");S.openPlant=null;window.__placing=false;render();break;
+    case "jview": S.journalView=t.getAttribute("data-v");render();break;
+    case "lfilter": S.logFilter=t.getAttribute("data-t");render();break;
+    case "pseg": S.plantSeg=t.getAttribute("data-v");render();break;
+
+    case "new-entry": openEntryForm();break;
+    case "new-photo": openEntryForm({type:"Photo"});break;
+    case "dictate": toggleDictate();break;
+    case "memo-toggle": toggleMemo();break;
+    case "rm-memo": if(draft.audioId){dbDel("audio",draft.audioId);urlCache.delete("audio:"+draft.audioId);draft.audioId=null;renderEntryForm();}break;
+    case "pick-photos": pickFiles(true,async f=>{const pid=await storePhoto(f);draft.photoIds.push(pid);renderEntryForm();});break;
+    case "rm-photo": {const pid=id;dbDel("photos",pid);urlCache.delete("photos:"+pid);draft.photoIds=draft.photoIds.filter(x=>x!==pid);renderEntryForm();}break;
+    case "save-entry": saveDraftEntry();break;
+    case "del-entry": if(confirm("Remove this entry?")){await removeEntry(id);render();}break;
+
+    case "new-plant": openPlantForm({status:"growing"});break;
+    case "new-wish": openPlantForm({status:"wishlist"});break;
+    case "open-plant": S.tab="plants";S.openPlant=id;render();break;
+    case "close-plant": S.openPlant=null;render();break;
+    case "edit-plant": openPlantForm({plant:plantOf(id)});break;
+    case "del-plant": if(confirm("Delete this plant page?")){await removePlant(id);S.openPlant=null;render();}break;
+    case "move-growing": {const p=plantOf(id);p.status="growing";await savePlant(p);render();}break;
+    case "pick-packet": pickFiles(false,async f=>{const pid=await storePhoto(f);if(pdraft.packetId){dbDel("photos",pdraft.packetId);urlCache.delete("photos:"+pdraft.packetId);}pdraft.packetId=pid;renderPlantForm();});break;
+    case "save-plant": saveDraftPlant();break;
+    case "log-for-plant": openEntryForm({plantId:id});break;
+
+    case "pick-map": pickMap();break;
+    case "add-bed": {const b={id:uid(),name:`Bed ${S.beds.length+1}`,x:null,y:null};await saveBed(b);openBedSheet(b.id);break;}
+    case "toggle-place": window.__placing=!window.__placing;render();break;
+    case "map-click": if(window.__placing){const wrap=t;const rimg=wrap.querySelector("img").getBoundingClientRect();const x=Math.max(3,Math.min(97,((ev.clientX-rimg.left)/rimg.width)*100));const y=Math.max(3,Math.min(97,((ev.clientY-rimg.top)/rimg.height)*100));const b={id:uid(),name:`Bed ${S.beds.length+1}`,x,y};await saveBed(b);window.__placing=false;render();openBedSheet(b.id);}break;
+    case "open-bed": openBedSheet(id);break;
+    case "log-for-bed": modalRoot.innerHTML="";openEntryForm({bedId:id});break;
+    case "del-bed": if(confirm("Delete this bed?")){await removeBed(id);modalRoot.innerHTML="";render();}break;
+
+    case "view": openViewer(t.getAttribute("data-eid"),t.getAttribute("data-photo")||t.getAttribute("data-photo-pick"));break;
+
+    case "add-supply": addSupplyFromInput();break;
+    case "toggle-supply": {const s=S.supplies.find(x=>x.id===id);s.done=!s.done;await saveSupply(s);render();}break;
+    case "del-supply": await removeSupply(id);render();break;
+
+    case "install-go": doInstall();break;
+    case "install-no": $("#install").classList.remove("show");break;
+  }
+});
+
+/* ============================================================
+ * INSTALL PROMPT + SW
+ * ============================================================ */
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;
+  const inStandalone=window.matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  if(!inStandalone&&!sessionStorage.getItem("installDismissed"))$("#install").classList.add("show");});
+async function doInstall(){$("#install").classList.remove("show");if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;}
+window.addEventListener("appinstalled",()=>{$("#install").classList.remove("show");toast("Installed — open it from your home screen.");});
+
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}
+
+boot();
+</script>
+</body>
+</html>
