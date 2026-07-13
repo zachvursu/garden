@@ -229,6 +229,9 @@ button{font-family:inherit}
 </div>
 <div id="toast"></div>
 
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="sync.js"></script>
 <script>
 "use strict";
 /* =============================================================
@@ -267,21 +270,23 @@ const SUN=["Full sun","Part sun","Part shade","Full shade"];
 const glyph = k => ({Vegetable:"🥬",Fruit:"🍓",Herb:"🌿",Flower:"🌸"}[k]||"🌱");
 
 /* ---------- IndexedDB ---------- */
-const STORES=["kv","beds","plants","entries","supplies","photos","audio"];
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("garden",1);
+const STORES=["kv","beds","plants","entries","supplies","photos","audio","outbox","syncmeta"];
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("garden",2);
   r.onupgradeneeded=e=>{const db=e.target.result;STORES.forEach(s=>{if(!db.objectStoreNames.contains(s))db.createObjectStore(s,{keyPath:s==="kv"?"k":"id"});});};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 async function dbAll(store){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(store).objectStore(store).getAll();rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
 async function dbGet(store,key){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(store).objectStore(store).get(key);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
-async function dbPut(store,val){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).put(val);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
-async function dbDel(store,key){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+async function dbPut(store,val){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).put(val);t.oncomplete=()=>{if(window.Sync&&!Sync._suspend)Sync.onPut(store,val);res();};t.onerror=()=>rej(t.error);});}
+async function dbDel(store,key){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>{if(window.Sync&&!Sync._suspend)Sync.onDel(store,key);res();};t.onerror=()=>rej(t.error);});}
 const kvGet=async k=>{const v=await dbGet("kv",k);return v?v.v:null;};
-const kvSet=(k,v)=>dbPut("kv",{k,v});
+const kvSet=(k,v)=>dbPut("kv",{k,v,updatedAt:Date.now()});
 
 /* ---------- blob storage + object URLs ---------- */
 const urlCache=new Map();
 async function blobURL(store,id){const key=store+":"+id;if(urlCache.has(key))return urlCache.get(key);
-  const rec=await dbGet(store,id);if(!rec||!rec.blob)return null;const u=URL.createObjectURL(rec.blob);urlCache.set(key,u);return u;}
+  let rec=await dbGet(store,id);
+  if((!rec||!rec.blob)&&window.Sync&&Sync.fetchMedia){const b=await Sync.fetchMedia(store,id);if(b)rec={id,blob:b};}
+  if(!rec||!rec.blob)return null;const u=URL.createObjectURL(rec.blob);urlCache.set(key,u);return u;}
 function compressToBlob(file,maxDim=1400,q=0.72){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);
   img.onload=()=>{URL.revokeObjectURL(u);let{width:w,height:h}=img;if(w>=h&&w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;}else if(h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;}
     const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);c.toBlob(b=>res(b),"image/jpeg",q);};
@@ -292,12 +297,22 @@ async function storeAudio(blob){const id=uid();await dbPut("audio",{id,blob});re
 /* ---------- state ---------- */
 const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,journalView:"journal",logFilter:"All",plantSeg:"growing"};
 
-async function boot(){
+async function loadState(){
   const [beds,plants,entries,supplies,region,mapId]=await Promise.all([
     dbAll("beds"),dbAll("plants"),dbAll("entries"),dbAll("supplies"),kvGet("region"),kvGet("mapId")]);
   S.beds=beds||[];S.plants=plants||[];S.entries=entries||[];S.supplies=supplies||[];S.region=region||"";S.mapId=mapId||null;
-  render();
 }
+async function boot(){
+  await loadState();
+  render();
+  if(window.Sync){Sync.init();Sync.start();}
+}
+// Called by the sync layer when remote changes land. Re-reads local data and
+// re-renders — but never yanks the screen out from under an open form/modal.
+window.reloadGarden=async function(){
+  await loadState();
+  if(!modalRoot.innerHTML)render();
+};
 
 /* ---------- derived ---------- */
 const plantOf=id=>S.plants.find(p=>p.id===id);
@@ -310,13 +325,13 @@ const growing=()=>S.plants.filter(p=>p.status!=="wishlist");
 const wishlist=()=>S.plants.filter(p=>p.status==="wishlist");
 
 /* ---------- persistence wrappers ---------- */
-async function saveEntry(e){await dbPut("entries",e);const i=S.entries.findIndex(x=>x.id===e.id);if(i>=0)S.entries[i]=e;else S.entries.push(e);}
+async function saveEntry(e){e.updatedAt=Date.now();await dbPut("entries",e);const i=S.entries.findIndex(x=>x.id===e.id);if(i>=0)S.entries[i]=e;else S.entries.push(e);}
 async function removeEntry(id){const e=S.entries.find(x=>x.id===id);if(e){(e.photoIds||[]).forEach(pid=>{dbDel("photos",pid);urlCache.delete("photos:"+pid);});if(e.audioId)dbDel("audio",e.audioId);}await dbDel("entries",id);S.entries=S.entries.filter(x=>x.id!==id);}
-async function savePlant(p){await dbPut("plants",p);const i=S.plants.findIndex(x=>x.id===p.id);if(i>=0)S.plants[i]=p;else S.plants.push(p);}
+async function savePlant(p){p.updatedAt=Date.now();await dbPut("plants",p);const i=S.plants.findIndex(x=>x.id===p.id);if(i>=0)S.plants[i]=p;else S.plants.push(p);}
 async function removePlant(id){const p=plantOf(id);if(p?.packetId){dbDel("photos",p.packetId);urlCache.delete("photos:"+p.packetId);}await dbDel("plants",id);S.plants=S.plants.filter(x=>x.id!==id);}
-async function saveBed(b){await dbPut("beds",b);const i=S.beds.findIndex(x=>x.id===b.id);if(i>=0)S.beds[i]=b;else S.beds.push(b);}
+async function saveBed(b){b.updatedAt=Date.now();await dbPut("beds",b);const i=S.beds.findIndex(x=>x.id===b.id);if(i>=0)S.beds[i]=b;else S.beds.push(b);}
 async function removeBed(id){await dbDel("beds",id);S.beds=S.beds.filter(x=>x.id!==id);}
-async function saveSupply(s){await dbPut("supplies",s);const i=S.supplies.findIndex(x=>x.id===s.id);if(i>=0)S.supplies[i]=s;else S.supplies.push(s);}
+async function saveSupply(s){s.updatedAt=Date.now();await dbPut("supplies",s);const i=S.supplies.findIndex(x=>x.id===s.id);if(i>=0)S.supplies[i]=s;else S.supplies.push(s);}
 async function removeSupply(id){await dbDel("supplies",id);S.supplies=S.supplies.filter(x=>x.id!==id);}
 
 /* ============================================================
@@ -465,10 +480,12 @@ function viewPlan(){
     ${wl.length?`<div class="chiprow">${wl.map(p=>`<button class="chip" data-action="open-plant" data-id="${p.id}">${esc(p.name)}</button>`).join("")}</div>`:`<p class="muted">No wishlist plants yet.</p>`}</div>
     <div class="plansec"><div class="sublabel">Region / zone</div>
     <input class="inline" style="width:100%" id="regioninput" value="${esc(S.region)}" placeholder="e.g. USDA 6a, Indiana" data-action="region-blur"></div>
-    <div class="plansec"><div class="sublabel">About & install</div>
-    <div class="aboutcard"><b>The Garden</b> stores everything on this device, in your browser — it works offline and nothing is uploaded.
-    ${iosStandalone?" It's installed. ":" To install on iPhone: open in Safari, tap Share, then <b>Add to Home Screen</b>. On Android/desktop Chrome, use the install prompt or the browser menu."}
-    Back up by keeping this app installed; clearing site data erases entries.</div></div>
+    <div class="plansec"><div class="sublabel">Backup & sync</div>
+    <div class="aboutcard"><span id="cloud-status">${window.Sync?Sync.statusText():""}</span>
+    <div style="margin-top:12px"><button class="btn sm ghost" data-action="export-backup">⤓ Download a backup</button></div>
+    <div style="margin-top:10px;font-size:12.5px">Your garden lives on this device and, when cloud sync is on, mirrors to the cloud so your phone and computer stay in step. A downloaded backup is a saveable copy you can keep anywhere.</div></div></div>
+    <div class="plansec"><div class="sublabel">Install</div>
+    <div class="aboutcard">${iosStandalone?"The Garden is installed on this device.":"To install on iPhone: open in Safari, tap Share, then <b>Add to Home Screen</b>. On Android/desktop Chrome, use the install prompt or the browser menu → Install."}</div></div>
   </div>`;
 }
 
@@ -699,6 +716,7 @@ document.addEventListener("click",async ev=>{
 
     case "install-go": doInstall();break;
     case "install-no": $("#install").classList.remove("show");break;
+    case "export-backup": if(window.Sync){toast("Preparing backup…");await Sync.exportBackup();}break;
   }
 });
 
