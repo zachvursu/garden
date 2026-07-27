@@ -480,6 +480,10 @@ function viewPlan(){
     ${wl.length?`<div class="chiprow">${wl.map(p=>`<button class="chip" data-action="open-plant" data-id="${p.id}">${esc(p.name)}</button>`).join("")}</div>`:`<p class="muted">No wishlist plants yet.</p>`}</div>
     <div class="plansec"><div class="sublabel">Region / zone</div>
     <input class="inline" style="width:100%" id="regioninput" value="${esc(S.region)}" placeholder="e.g. USDA 6a, Indiana" data-action="region-blur"></div>
+    <div class="plansec"><div class="sublabel">AI autofill</div>
+    <div class="aboutcard"><span id="ai-status">${aiKey()?"Connected. Tap ✨ on any plant to fill in its care details.":"Not set up yet. Add an Anthropic API key to let AI fill in plant care details for you."}</span>
+    <div style="margin-top:12px">${aiKey()?`<button class="btn sm ghost" data-action="ai-set-key">Change key</button> <button class="btn sm ghost" data-action="ai-clear-key">Remove</button>`:`<button class="btn sm" data-action="ai-set-key">Add API key</button>`}</div>
+    <div style="margin-top:10px;font-size:12.5px">Your key is stored only on this device and is sent straight to Anthropic when you tap ✨. Get one at console.anthropic.com. AI fills care details for the region above, so set your zone for the best results.</div></div></div>
     <div class="plansec"><div class="sublabel">Backup & sync</div>
     <div class="aboutcard"><span id="cloud-status">${window.Sync?Sync.statusText():""}</span>
     <div style="margin-top:12px"><button class="btn sm ghost" data-action="export-backup">⤓ Download a backup</button></div>
@@ -599,6 +603,7 @@ function renderPlantForm(){
     <div style="text-align:center;margin-bottom:14px">${f.packetId?`<img data-photo="${f.packetId}" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;border:1px solid var(--line)" alt="">`:""}
       <button class="attachbtn" style="width:100%;margin-top:${f.packetId?"8px":"0"}" data-action="pick-packet">${f.packetId?"Change seed packet / plant photo":"＋ Seed packet / plant photo"}</button></div>
     <label class="field"><span>Name</span><input id="pf-name" value="${esc(f.name)}" placeholder="Sungold tomato, Music garlic, moso bamboo…"></label>
+    <button class="btn ghost" id="pf-ai" data-action="ai-fill" style="width:100%;margin-bottom:14px">✨ Fill the details with AI</button>
     <div class="row"><label class="field"><span>Kind</span><select id="pf-kind">${KINDS.map(k=>`<option ${f.kind===k?"selected":""}>${k}</option>`).join("")}</select></label>
       <label class="field"><span>Lifecycle</span><select id="pf-life">${sel(LIFE,f.lifecycle)}</select></label></div>
     <div class="row"><label class="field"><span>Sun</span><select id="pf-sun">${sel(SUN,f.sun)}</select></label>
@@ -620,6 +625,60 @@ function collectPlant(){const g=id=>$(id)?.value||"";
   pdraft.daysToMaturity=g("#pf-dtm");pdraft.whenToPlant=g("#pf-when");pdraft.howToPlant=g("#pf-how");pdraft.spacing=g("#pf-space");
   pdraft.watering=g("#pf-water");pdraft.fertilizing=g("#pf-fert");pdraft.bulbInfo=g("#pf-bulb");pdraft.source=g("#pf-src");pdraft.careNotes=g("#pf-notes");}
 async function saveDraftPlant(){collectPlant();if(!pdraft.name){toast("Give the plant a name.");return;}await savePlant(pdraft);modalRoot.innerHTML="";const id=pdraft.id;pdraft=null;render();toast("Saved");}
+
+/* ---------- AI autofill (browser → Anthropic, key stays on device) ---------- */
+const AI_MODEL="claude-opus-5";
+const aiKey=()=>{try{return localStorage.getItem("garden.aiKey")||"";}catch(_){return "";}};
+function setAiKey(){
+  const v=prompt("Paste your Anthropic API key (starts with sk-ant-). It is stored only on this device.",aiKey());
+  if(v===null)return false;
+  const t=v.trim();
+  try{if(t)localStorage.setItem("garden.aiKey",t);else localStorage.removeItem("garden.aiKey");}catch(_){}
+  return !!t;
+}
+function clearAiKey(){if(confirm("Remove the saved AI key from this device?")){try{localStorage.removeItem("garden.aiKey");}catch(_){}toast("Key removed");render();}}
+const AI_FIELDS=["kind","lifecycle","sun","daysToMaturity","whenToPlant","howToPlant","spacing","watering","fertilizing","bulbInfo","careNotes"];
+async function aiFillPlant(){
+  collectPlant();
+  if(!pdraft.name){toast("Type the plant's name first.");return;}
+  if(!aiKey()&&!setAiKey())return;
+  const btn=$("#pf-ai");if(btn){btn.disabled=true;btn.textContent="Thinking…";}
+  try{
+    const region=(S.region||"").trim();
+    const schema={type:"object",additionalProperties:false,required:AI_FIELDS,properties:{
+      kind:{type:"string",enum:KINDS},
+      lifecycle:{type:"string",enum:LIFE},
+      sun:{type:"string",enum:SUN},
+      daysToMaturity:{type:"string",description:'e.g. "65 days" — empty string if not applicable'},
+      whenToPlant:{type:"string",description:'short phrase, e.g. "After last frost, mid-May"'},
+      howToPlant:{type:"string",description:"1-2 sentences: depth, starting method, hardening off"},
+      spacing:{type:"string",description:'e.g. "18\\" apart"'},
+      watering:{type:"string",description:'e.g. "1in / week"'},
+      fertilizing:{type:"string",description:'short, e.g. "Balanced feed every 3 weeks"'},
+      bulbInfo:{type:"string",description:"bulb size / planting depth / chill needs, or seed-starting notes; empty if not relevant"},
+      careNotes:{type:"string",description:"a couple of concise, practical tips"}
+    }};
+    const sys="You are a horticulture expert filling in a home gardener's plant care card. Give accurate, concise, practical values for the named plant"+(region?(", tailored to the grower's region: "+region):"")+". Keep each field short and phone-friendly, matching this compact style: days to maturity \"65 days\", spacing \"18\\\" apart\", watering \"1in / week\". If a field does not apply, return an empty string.";
+    const user="Plant: "+pdraft.name+(pdraft.kind?(" (kind hint: "+pdraft.kind+")"):"")+"\nFill in the care details.";
+    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":aiKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:AI_MODEL,max_tokens:1200,thinking:{type:"disabled"},output_config:{effort:"low",format:{type:"json_schema",schema}},system:sys,messages:[{role:"user",content:user}]})});
+    if(!res.ok){
+      toast(res.status===401?"That API key was rejected.":("AI request failed ("+res.status+")"));
+      if(res.status===401)setAiKey();
+      return;
+    }
+    const data=await res.json();
+    const block=(data.content||[]).find(b=>b.type==="text");
+    if(!block){toast("No answer came back — try again.");return;}
+    const out=JSON.parse(block.text);
+    for(const k of AI_FIELDS){if(typeof out[k]==="string"&&out[k]!=="")pdraft[k]=out[k];}
+    renderPlantForm();
+    toast("Filled in — tweak anything that's off.");
+  }catch(_){
+    toast("Couldn't reach the AI. Check your connection and key.");
+  }finally{
+    const b=$("#pf-ai");if(b){b.disabled=false;b.textContent="✨ Fill the details with AI";}
+  }
+}
 
 /* ============================================================
  * BED SHEET
@@ -698,6 +757,9 @@ document.addEventListener("click",async ev=>{
     case "move-growing": {const p=plantOf(id);p.status="growing";await savePlant(p);render();}break;
     case "pick-packet": pickFiles(false,async f=>{const pid=await storePhoto(f);if(pdraft.packetId){dbDel("photos",pdraft.packetId);urlCache.delete("photos:"+pdraft.packetId);}pdraft.packetId=pid;renderPlantForm();});break;
     case "save-plant": saveDraftPlant();break;
+    case "ai-fill": aiFillPlant();break;
+    case "ai-set-key": if(setAiKey())render();break;
+    case "ai-clear-key": clearAiKey();break;
     case "log-for-plant": openEntryForm({plantId:id});break;
 
     case "pick-map": pickMap();break;
