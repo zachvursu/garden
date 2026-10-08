@@ -102,6 +102,16 @@ button{font-family:inherit}
 .chip.active{background:var(--ochre);border-color:var(--ochre);color:#241a06}
 .chip.ghost{color:var(--soft)}
 .chiprow{display:flex;flex-wrap:wrap;gap:8px}
+.layoutmap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:16px}
+.layoutmap svg{width:100%;height:auto;display:block}
+.lbed{cursor:pointer;stroke:#2A2A26;stroke-width:.1;stroke-linejoin:round;transition:opacity .15s}
+.lbed.raised{fill:#FBFAF4}.lbed.ground{fill:#F2D9C9}
+.lbed:active{opacity:.6}
+.llabel{font-size:.72px;font-weight:600;fill:var(--green-d);text-anchor:middle;dominant-baseline:central;pointer-events:none;font-family:Inter,system-ui,sans-serif}
+.lcount{font-size:.55px;fill:#241a06;pointer-events:none}
+.llegend{display:flex;gap:14px;font-size:12px;color:var(--soft);margin:2px 4px 0}
+.llegend i{display:inline-block;width:11px;height:11px;border:1px solid #2A2A26;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.bedmeta{font-size:13px;color:var(--soft);margin:-4px 0 12px}
 .map{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);line-height:0}
 .map.placing{cursor:crosshair;outline:2px dashed var(--ochre);outline-offset:-2px}
 .map img{width:100%;height:auto;display:block}
@@ -294,6 +304,43 @@ function compressToBlob(file,maxDim=1400,q=0.72){return new Promise((res,rej)=>{
 async function storePhoto(file){const blob=await compressToBlob(file);const id=uid();await dbPut("photos",{id,blob});return id;}
 async function storeAudio(blob){const id=uid();await dbPut("audio",{id,blob});return id;}
 
+/* ---------- plot layout ----------
+ * 1 unit = 2 ft. Points are [x,y] corners. To change the layout: edit this list
+ * and bump LAYOUT_V — on next load, existing beds (matched by id) get the new
+ * shape/kind, keeping their name and logs; new ids are added.
+ * (Removing an id here does NOT delete the bed; delete it in the app.) */
+const LAYOUT_V=1;
+const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+const LAYOUT=[
+  {id:"lay-g-west",name:"Ground West",code:"GW",kind:"ground",poly:rect(0,2,4,12)},
+  {id:"lay-g-step",name:"Ground Step",code:"GS",kind:"ground",poly:[[12,15],[20,15],[20,19],[16,19],[16,17],[12,17]]},
+  {id:"lay-g-l",name:"Ground L",code:"GL",kind:"ground",poly:[[22,15],[24,15],[24,23],[12,23],[12,21],[22,21]]},
+  {id:"lay-r-top-w",name:"Top West",code:"TW",kind:"raised",poly:rect(6,0,9,2)},
+  {id:"lay-r-top-e",name:"Top East",code:"TE",kind:"raised",poly:rect(17,0,9,2)},
+  {id:"lay-r-strip-w1",name:"Strip West 1",code:"W1",kind:"raised",poly:rect(6,4,2,10)},
+  {id:"lay-r-strip-w2",name:"Strip West 2",code:"W2",kind:"raised",poly:rect(8,4,2,10)},
+  {id:"lay-r-strip-e1",name:"Strip East 1",code:"E1",kind:"raised",poly:rect(22,4,2,10)},
+  {id:"lay-r-strip-e2",name:"Strip East 2",code:"E2",kind:"raised",poly:rect(24,4,2,10)},
+  {id:"lay-r-mid-w1",name:"Mid West 1",code:"MW1",kind:"raised",poly:rect(12,4,3,2)},
+  {id:"lay-r-mid-w2",name:"Mid West 2",code:"MW2",kind:"raised",poly:rect(12,8,3,2)},
+  {id:"lay-r-mid-w3",name:"Mid West 3",code:"MW3",kind:"raised",poly:rect(12,12,3,2)},
+  {id:"lay-r-mid-e1",name:"Mid East 1",code:"ME1",kind:"raised",poly:rect(17,4,3,2)},
+  {id:"lay-r-mid-e2",name:"Mid East 2",code:"ME2",kind:"raised",poly:rect(17,8,3,2)},
+  {id:"lay-r-mid-e3",name:"Mid East 3",code:"ME3",kind:"raised",poly:rect(17,12,3,2)},
+];
+const polyBox=poly=>{const xs=poly.map(p=>p[0]),ys=poly.map(p=>p[1]);return{x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};};
+const polyArea=poly=>Math.abs(poly.reduce((a,p,i)=>{const q=poly[(i+1)%poly.length];return a+p[0]*q[1]-q[0]*p[1];},0))/2;
+const bedSizeText=b=>{if(!b.poly)return"";const bx=polyBox(b.poly),a=polyArea(b.poly)*4;const rectish=Math.abs(bx.w*bx.h-polyArea(b.poly))<1e-6;
+  return `${b.kind==="ground"?"Ground bed":"Raised bed"} · ${rectish?`${bx.w*2} × ${bx.h*2} ft · `:""}${a} sq ft`;};
+async function ensureLayout(){
+  if((await kvGet("layoutV")||0)>=LAYOUT_V)return;
+  for(const d of LAYOUT){
+    const cur=bedOf(d.id)||{id:d.id,name:d.name,x:null,y:null};
+    await saveBed({...cur,code:d.code,kind:d.kind,poly:d.poly,layoutV:LAYOUT_V});
+  }
+  await kvSet("layoutV",LAYOUT_V);
+}
+
 /* ---------- state ---------- */
 const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,journalView:"journal",logFilter:"All",plantSeg:"growing"};
 
@@ -304,6 +351,7 @@ async function loadState(){
 }
 async function boot(){
   await loadState();
+  await ensureLayout();
   render();
   if(window.Sync){Sync.init();Sync.start();}
 }
@@ -441,20 +489,31 @@ function viewPlantDetail(){
 }
 
 /* ---------------- PLOT ---------------- */
+function layoutSVG(){
+  const lb=S.beds.filter(b=>b.poly);if(!lb.length)return"";
+  const all=lb.flatMap(b=>b.poly),W=Math.max(...all.map(p=>p[0])),H=Math.max(...all.map(p=>p[1]));
+  const shapes=lb.map(b=>{const bx=polyBox(b.poly),n=entriesForBed(b.id).length;
+    const big=b.poly.length>4?(b.id==="lay-g-l"?{x:17,y:22}:{x:14,y:16}):{x:bx.x+bx.w/2,y:bx.y+bx.h/2};
+    const label=b.code||b.name;
+    return `<path class="lbed ${b.kind||"raised"}" d="M${b.poly.map(p=>p.join(" ")).join("L")}Z" data-action="open-bed" data-id="${b.id}"><title>${esc(b.name)} — ${esc(bedSizeText(b))}</title></path>
+      <text class="llabel" x="${big.x}" y="${big.y-(n?.3:0)}">${esc(label)}</text>${n?`<text class="llabel lcount" x="${big.x}" y="${big.y+.55}">${n} log${n>1?"s":""}</text>`:""}`;}).join("");
+  const raised=lb.filter(b=>b.kind==="raised").length,ground=lb.length-raised;
+  return `<div class="layoutmap"><svg viewBox="-.5 -.5 ${W+1} ${H+1}" role="img" aria-label="Plot layout">${shapes}</svg>
+    <div class="llegend"><span><i style="background:#F2D9C9"></i>Ground (${lb.filter(b=>b.kind==="ground").length})</span><span><i style="background:#FBFAF4"></i>Raised (${raised})</span><span>1 square = 2 ft</span></div></div>`;
+}
 function viewPlot(){
-  let body;
+  let body=layoutSVG();
+  const off=S.beds.filter(b=>!b.poly&&b.x==null);
+  const offHTML=off.length?`<div class="pd-sec"><div class="sublabel">Beds not on the map</div><div class="chiprow">${off.map(b=>`<button class="chip" data-action="open-bed" data-id="${b.id}">${esc(b.name)}</button>`).join("")}</div></div>`:"";
   if(!S.mapId){
-    body=`<div class="empty"><p class="empty-h">Add a photo of your plot</p><p class="empty-p">An overhead shot works best. Drop a tag on each bed, then any entry can point back to it.</p>
-      <button class="btn" data-action="pick-map">Add plot photo</button><button class="linkbtn" style="margin:12px auto 0" data-action="add-bed">or add a bed without a photo</button></div>`;
+    body+=`<div class="maptools"><button class="chip ghost" data-action="pick-map">Add plot photo</button><button class="chip ghost" data-action="add-bed">＋ Bed (no map)</button></div>${offHTML}`;
   } else {
-    const off=S.beds.filter(b=>b.x==null);
-    body=`<div class="maptools">
+    body+=`<div class="sublabel">Plot photo</div><div class="maptools">
       <button class="chip ${window.__placing?"active":""}" data-action="toggle-place">${window.__placing?"Tap the plot to drop a tag…":"＋ Tag a bed"}</button>
       <button class="chip ghost" data-action="add-bed">＋ Bed (no map)</button>
       <button class="chip ghost" data-action="pick-map">Replace photo</button></div>
       <div class="map ${window.__placing?"placing":""}" data-action="map-click"><img data-photo-map="${S.mapId}" alt="Your plot">
-      ${S.beds.filter(b=>b.x!=null).map(b=>`<button class="pin" style="left:${b.x}%;top:${b.y}%" data-action="open-bed" data-id="${b.id}"><span class="pin-tag">${esc(b.name)}${entriesForBed(b.id).length?`<em>${entriesForBed(b.id).length}</em>`:""}</span></button>`).join("")}</div>
-      ${off.length?`<div class="pd-sec"><div class="sublabel">Beds not on the map</div><div class="chiprow">${off.map(b=>`<button class="chip" data-action="open-bed" data-id="${b.id}">${esc(b.name)}</button>`).join("")}</div></div>`:""}`;
+      ${S.beds.filter(b=>!b.poly&&b.x!=null).map(b=>`<button class="pin" style="left:${b.x}%;top:${b.y}%" data-action="open-bed" data-id="${b.id}"><span class="pin-tag">${esc(b.name)}${entriesForBed(b.id).length?`<em>${entriesForBed(b.id).length}</em>`:""}</span></button>`).join("")}</div>${offHTML}`;
   }
   return `<div class="screen">${screenHead("Map & beds","Plot",[[S.beds.length,"beds"]])}${body}</div>`;
 }
@@ -629,6 +688,7 @@ function openBedSheet(id){
   const evs=entriesForBed(id).slice().sort((a,b2)=>(b2.date||"").localeCompare(a.date||""));
   modalRoot.innerHTML=`<div class="scrim" data-action="close-modal2"><div class="sheet" data-stop>
     <div class="grab"></div><div class="sheet-head"><input id="bedname" value="${esc(b.name)}" style="font-family:'Fraunces',serif;font-size:22px;border:none;border-bottom:2px solid var(--green);background:none;padding:2px 0;width:70%"><button class="x" data-action="close-modal2">✕</button></div>
+    ${b.poly?`<div class="bedmeta">${esc(bedSizeText(b))}</div>`:""}
     <button class="btn wide" style="margin-bottom:14px" data-action="log-for-bed" data-id="${id}">＋ Log in this bed</button>
     ${evs.length?`<ul class="tl">${evs.map(e=>`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card"><div class="jcard-top"><span class="badge sm" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>${nameOf(e)?`<div class="jtag">${esc(nameOf(e))}</div>`:""}${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="muted" style="text-align:center;padding:12px">Nothing logged in this bed yet.</p>`}
     <button class="deletebed" data-action="del-bed" data-id="${id}">Delete this bed</button>
