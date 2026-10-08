@@ -1,5 +1,5 @@
 /* The Garden — service worker (offline app shell + runtime cache) */
-const CACHE = "garden-v2";
+const CACHE = "garden-v3";
 const SHELL = [
   "./",
   "./index.html",
