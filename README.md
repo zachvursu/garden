@@ -1,3 +1,8 @@
+> **ARCHIVED — do not edit or deploy from here.**
+> The garden app now lives in `public/garden/` of the `zachvursu/zachlinder.com`
+> repo and is served at zachlinder.com/garden. Changes made in this repo never
+> reach production. Make all changes there.
+
 # The Garden — a private, installable garden PWA
 
 A voice + written diary for your plot. Everything (entries, photos, voice memos,
