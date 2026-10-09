@@ -342,7 +342,7 @@ async function ensureLayout(){
 }
 
 /* ---------- state ---------- */
-const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,journalView:"journal",logFilter:"All",plantSeg:"growing"};
+const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,logFilter:"All",plantSeg:"growing"};
 
 async function loadState(){
   const [beds,plants,entries,supplies,region,mapId]=await Promise.all([
@@ -420,33 +420,21 @@ function viewDiary(){
     <button class="bigmic" data-action="new-entry" aria-label="New voice entry"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="capture-txt" data-action="new-entry"><b>New entry</b><span>Speak it or type it — add photos too</span></div>
   </div>`;
-  body+=`<div class="seg">
-    <button class="segb ${S.journalView==="journal"?"on":""}" data-action="jview" data-v="journal">Journal</button>
-    <button class="segb ${S.journalView==="log"?"on":""}" data-action="jview" data-v="log">Log</button></div>`;
-
   if(!entries.length){body+=emptyBox("Your journal is empty","Tap the mic to talk through what you did today, or type a note. Everything you add flows into the timeline and onto each plant's page.",{a:"new-entry",label:"＋ Add first entry"});}
-  else if(S.journalView==="journal"){
-    body+=entries.map(e=>{const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
-      return `<article class="jcard">
+  else {
+    body+=`<div class="filterrow">${["All",...TYPES.map(t=>t.t)].map(t=>`<button class="fchip ${S.logFilter===t?"on":""}" ${S.logFilter===t&&t!=="All"?`style="background:${eColor(t)};border-color:${eColor(t)};color:#fff"`:""} data-action="lfilter" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
+    const rows=S.logFilter==="All"?entries:entries.filter(e=>e.type===S.logFilter);
+    if(!rows.length)body+=`<p class="empty-p" style="text-align:center;margin-top:24px">No ${esc(S.logFilter.toLowerCase())} entries yet.</p>`;
+    let lm=null;
+    rows.forEach(e=>{const mk=monthKey(e.date);if(mk!==lm){body+=`<div class="tl-month">${mk}</div>`;lm=mk;}const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
+      body+=`<article class="jcard">
         <div class="jcard-top"><span class="badge" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>
         ${(nm||bd)?`<div class="jtag">${esc(nm)}${bd?` <em>· ${esc(bd.name)}</em>`:""}</div>`:""}
         ${e.text?`<div class="jtext">${esc(e.text)}</div>`:""}
         ${(e.photoIds&&e.photoIds.length)?`<div class="jphotos">${e.photoIds.map(pid=>`<img data-photo="${pid}" data-action="view" data-eid="${e.id}" alt="">`).join("")}</div>`:""}
         ${e.audioId?`<audio class="jaudio" controls data-audio="${e.audioId}"></audio>`:""}
         <button class="del" data-action="del-entry" data-id="${e.id}">remove</button>
-      </article>`;}).join("");
-  } else {
-    body+=`<div class="filterrow">${["All",...TYPES.map(t=>t.t)].map(t=>`<button class="fchip ${S.logFilter===t?"on":""}" ${S.logFilter===t&&t!=="All"?`style="background:${eColor(t)};border-color:${eColor(t)};color:#fff"`:""} data-action="lfilter" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
-    const rows=S.logFilter==="All"?entries:entries.filter(e=>e.type===S.logFilter);
-    let lm=null;body+=`<ul class="tl">`;
-    rows.forEach(e=>{const mk=monthKey(e.date);if(mk!==lm){body+=`<li class="tl-month">${mk}</li>`;lm=mk;}const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
-      body+=`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card">
-        <div class="jcard-top"><span class="badge" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>
-        ${(nm||bd)?`<div class="jtag">${esc(nm)}${bd?` <em>· ${esc(bd.name)}</em>`:""}</div>`:""}
-        ${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}
-        ${(e.photoIds&&e.photoIds.length)?`<div class="tl-thumbs">${e.photoIds.map(pid=>`<img data-photo="${pid}" data-action="view" data-eid="${e.id}" alt="">`).join("")}</div>`:""}
-        <button class="del" data-action="del-entry" data-id="${e.id}">remove</button></div></li>`;});
-    body+=`</ul>`;
+      </article>`;});
   }
   return `<div class="screen">${screenHead("Voice & written","Diary",[[S.entries.length,"entries"],[growing().length,"growing"]])}${body}</div>`;
 }
@@ -735,7 +723,6 @@ document.addEventListener("click",async ev=>{
 
   switch(a){
     case "tab": S.tab=t.getAttribute("data-tab");S.openPlant=null;window.__placing=false;render();break;
-    case "jview": S.journalView=t.getAttribute("data-v");render();break;
     case "lfilter": S.logFilter=t.getAttribute("data-t");render();break;
     case "pseg": S.plantSeg=t.getAttribute("data-v");render();break;
 
