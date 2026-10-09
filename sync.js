@@ -19,7 +19,7 @@
 (function () {
   "use strict";
 
-  const RECORD_STORES = ["entries", "plants", "beds", "supplies", "kv"];
+  const RECORD_STORES = ["entries", "plants", "plantings", "beds", "supplies", "kv"];
   const MEDIA_STORES = ["photos", "audio"];
   const EPOCH = "1970-01-01T00:00:00Z";
 

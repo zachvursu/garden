@@ -69,7 +69,7 @@ button{font-family:inherit}
 .filterrow{display:flex;gap:7px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
 .filterrow::-webkit-scrollbar{display:none}
 .fchip{flex:0 0 auto;background:var(--card);border:1px solid var(--line);font:inherit;font-size:12.5px;color:var(--soft);padding:6px 12px;border-radius:16px;cursor:pointer;white-space:nowrap}
-.fchip.on{color:#fff}
+.fchip.on{color:#fff;background:var(--green);border-color:var(--green)}
 
 /* journal cards */
 .jcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px;margin-bottom:13px;position:relative}
@@ -227,6 +227,19 @@ button{font-family:inherit}
 @keyframes sh{from{background-position:200% 0}to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:420px){.title{font-size:31px}.stats{gap:11px}.stat-n{font-size:19px}}
+.seasonbar{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.yrbtn{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;line-height:1;cursor:pointer}
+.yr{font-family:'Fraunces',serif;font-size:19px;min-width:46px;text-align:center}
+.lbed.planted{fill:#DCE8CF}
+.plist{list-style:none;margin:0 0 16px;padding:0}
+.plrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.plrow.tap{cursor:pointer}
+.plname{flex:1;font-size:14.5px}.plname em{color:var(--soft);font-style:normal}
+.plyear{font-family:'Fraunces',serif;font-size:14px;color:var(--soft);margin:12px 0 2px}
+.plstat{font:inherit;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--soft);padding:3px 10px;border-radius:20px;cursor:pointer}
+.plstat.Planted{background:#DCE8CF;color:var(--green-d);border-color:#BCD1AA}
+.plstat.Harvested{background:#F2D9C9;color:var(--brick);border-color:#E3BFA9}
+.plx{background:none;border:none;color:var(--soft);cursor:pointer;font-size:14px;padding:4px}
 </style>
 </head>
 <body>
@@ -280,8 +293,8 @@ const SUN=["Full sun","Part sun","Part shade","Full shade"];
 const glyph = k => ({Vegetable:"🥬",Fruit:"🍓",Herb:"🌿",Flower:"🌸"}[k]||"🌱");
 
 /* ---------- IndexedDB ---------- */
-const STORES=["kv","beds","plants","entries","supplies","photos","audio","outbox","syncmeta"];
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("garden",2);
+const STORES=["kv","beds","plants","plantings","entries","supplies","photos","audio","outbox","syncmeta"];
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("garden",3);
   r.onupgradeneeded=e=>{const db=e.target.result;STORES.forEach(s=>{if(!db.objectStoreNames.contains(s))db.createObjectStore(s,{keyPath:s==="kv"?"k":"id"});});};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 async function dbAll(store){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(store).objectStore(store).getAll();rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
@@ -342,16 +355,58 @@ async function ensureLayout(){
 }
 
 /* ---------- state ---------- */
-const S={tab:"diary",beds:[],plants:[],entries:[],supplies:[],region:"",mapId:null,openPlant:null,logFilter:"All",plantSeg:"growing"};
+/* ---------- seasons + plantings ---------- */
+const SEASONS=["Spring","Summer","Fall"];
+const PSTAT=["Planned","Planted","Harvested"];
+const seasonOfDate=d=>{const m=+(d||"").slice(5,7);return m>=3&&m<=5?"Spring":m>=6&&m<=8?"Summer":m>=9&&m<=11?"Fall":m===12?"Fall":"Spring";};
+const localISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+const S={tab:"diary",beds:[],plants:[],plantings:[],year:new Date().getFullYear(),season:seasonOfDate(localISO()),diaryYear:"All",diarySeason:"All",entries:[],supplies:[],region:"",mapId:null,openPlant:null,logFilter:"All",plantSeg:"growing"};
+
+/* ---------- starter plant list ----------
+ * Pre-seeded plant pages (name, kind, lifecycle only — fill in the rest as you go).
+ * Matched by name, so re-running never duplicates or touches a plant you already
+ * have. To add more later: append to this list and bump PLANT_SEED_V. */
+const PLANT_SEED_V=1;
+const PLANT_SEED=[
+  ["Snow-on-the-mountain","Annual"],["Celosia","Annual"],["Zinnias","Annual"],["Cockscomb celosia","Annual"],
+  ["Strawflowers","Annual"],["Craspedia","Perennial"],["Gomphrena","Annual"],["Lisianthus","Annual"],
+  ["African marigolds","Annual"],["Scabiosa",""],["Verbena bonariensis","Tender perennial"],["Foxglove","Biennial"],
+  ["Eucalyptus","Perennial"],["Dahlias","Tender perennial"],["Gladiolus","Tender perennial"],["Ranunculus","Tender perennial"],
+  ["Sunflowers","Annual"],["Tulips","Perennial"],["Daffodils","Perennial"],["Hyacinths","Perennial"],
+  ["Iris","Perennial"],["Lilies","Perennial"],["Peonies","Perennial"],["Roses","Perennial"],
+  ["Rocket larkspur","Annual"],["Delphinium","Perennial"],["Feverfew","Perennial"],["Cosmos","Annual"],
+  ["Snapdragons","Annual"],["Yarrow","Perennial"],["Bachelor's buttons","Annual"],["Sweet alyssum","Annual"],
+  ["Flowering basil","Annual","Herb"],["Flowering dill","Annual","Herb"],["Ornamental millet / grasses","Annual"],["Bells of Ireland","Annual"],
+  ["Nigella","Annual"],["Shirley poppies","Annual"],["Iceland poppies","Perennial"],["California poppies","Annual"],
+  ["Calendula","Annual"],["Forget-me-nots","Biennial"],["Columbine","Perennial"],["Rudbeckia","Perennial"],
+  ["Echinacea","Perennial"],["Bee balm","Perennial"],["Wild bergamot","Perennial"],["Coreopsis","Perennial"],
+  ["Purple prairie clover","Perennial"],["Milkweed","Perennial"],["Little bluestem","Perennial"],["Sweet peas","Annual"],
+  ["Bupleurum","Annual"],["Ammi","Annual"],["Orlaya","Annual"],["Statice","Annual"],
+  ["Amaranth","Annual"],["China asters","Annual"],["Sweet William","Biennial"],["Annual phlox","Annual"],
+  ["Ageratum","Annual"],["Mignonette","Annual"],["Sedum","Perennial"],
+];
+async function ensureSeedPlants(){
+  if((await kvGet("plantSeedV")||0)>=PLANT_SEED_V)return;
+  const have=new Set(S.plants.map(p=>(p.name||"").trim().toLowerCase()));
+  for(const [name,lifecycle,kind] of PLANT_SEED){
+    if(have.has(name.toLowerCase()))continue;
+    // updatedAt:1 so any real edit (here or on another device) wins sync conflicts
+    await dbPut("plants",{id:"seed-"+name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),status:"growing",kind:kind||"Flower",name,lifecycle,
+      sun:"",whenToPlant:"",howToPlant:"",spacing:"",daysToMaturity:"",watering:"",fertilizing:"",bulbInfo:"",source:"",careNotes:"",packetId:null,updatedAt:1});
+  }
+  await kvSet("plantSeedV",PLANT_SEED_V);
+  S.plants=await dbAll("plants");
+}
 
 async function loadState(){
-  const [beds,plants,entries,supplies,region,mapId]=await Promise.all([
-    dbAll("beds"),dbAll("plants"),dbAll("entries"),dbAll("supplies"),kvGet("region"),kvGet("mapId")]);
-  S.beds=beds||[];S.plants=plants||[];S.entries=entries||[];S.supplies=supplies||[];S.region=region||"";S.mapId=mapId||null;
+  const [beds,plants,plantings,entries,supplies,region,mapId]=await Promise.all([
+    dbAll("beds"),dbAll("plants"),dbAll("plantings"),dbAll("entries"),dbAll("supplies"),kvGet("region"),kvGet("mapId")]);
+  S.plantings=plantings||[];S.beds=beds||[];S.plants=plants||[];S.entries=entries||[];S.supplies=supplies||[];S.region=region||"";S.mapId=mapId||null;
 }
 async function boot(){
   await loadState();
   await ensureLayout();
+  await ensureSeedPlants();
   render();
   if(window.Sync){Sync.init();Sync.start();}
 }
@@ -369,6 +424,8 @@ const nameOf=e=>e.plantId?(plantOf(e.plantId)?.name||e.plantName||""):(e.plantNa
 const sortedEntries=()=>S.entries.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
 const entriesForPlant=p=>S.entries.filter(e=>e.plantId===p.id||(e.plantName&&p.name&&e.plantName.toLowerCase()===p.name.toLowerCase()));
 const entriesForBed=id=>S.entries.filter(e=>e.bedId===id);
+const plantingsFor=(bedId,y=S.year,s=S.season)=>S.plantings.filter(x=>x.bedId===bedId&&x.year===y&&x.season===s);
+const sortPl=(a,b)=>b.year-a.year||SEASONS.indexOf(b.season)-SEASONS.indexOf(a.season);
 const growing=()=>S.plants.filter(p=>p.status!=="wishlist");
 const wishlist=()=>S.plants.filter(p=>p.status==="wishlist");
 
@@ -376,9 +433,11 @@ const wishlist=()=>S.plants.filter(p=>p.status==="wishlist");
 async function saveEntry(e){e.updatedAt=Date.now();await dbPut("entries",e);const i=S.entries.findIndex(x=>x.id===e.id);if(i>=0)S.entries[i]=e;else S.entries.push(e);}
 async function removeEntry(id){const e=S.entries.find(x=>x.id===id);if(e){(e.photoIds||[]).forEach(pid=>{dbDel("photos",pid);urlCache.delete("photos:"+pid);});if(e.audioId)dbDel("audio",e.audioId);}await dbDel("entries",id);S.entries=S.entries.filter(x=>x.id!==id);}
 async function savePlant(p){p.updatedAt=Date.now();await dbPut("plants",p);const i=S.plants.findIndex(x=>x.id===p.id);if(i>=0)S.plants[i]=p;else S.plants.push(p);}
-async function removePlant(id){const p=plantOf(id);if(p?.packetId){dbDel("photos",p.packetId);urlCache.delete("photos:"+p.packetId);}await dbDel("plants",id);S.plants=S.plants.filter(x=>x.id!==id);}
+async function savePlanting(x){x.updatedAt=Date.now();await dbPut("plantings",x);const i=S.plantings.findIndex(y=>y.id===x.id);if(i>=0)S.plantings[i]=x;else S.plantings.push(x);}
+async function removePlanting(id){await dbDel("plantings",id);S.plantings=S.plantings.filter(x=>x.id!==id);}
+async function removePlant(id){for(const x of S.plantings.filter(x=>x.plantId===id))await removePlanting(x.id);const p=plantOf(id);if(p?.packetId){dbDel("photos",p.packetId);urlCache.delete("photos:"+p.packetId);}await dbDel("plants",id);S.plants=S.plants.filter(x=>x.id!==id);}
 async function saveBed(b){b.updatedAt=Date.now();await dbPut("beds",b);const i=S.beds.findIndex(x=>x.id===b.id);if(i>=0)S.beds[i]=b;else S.beds.push(b);}
-async function removeBed(id){await dbDel("beds",id);S.beds=S.beds.filter(x=>x.id!==id);}
+async function removeBed(id){for(const x of S.plantings.filter(x=>x.bedId===id))await removePlanting(x.id);await dbDel("beds",id);S.beds=S.beds.filter(x=>x.id!==id);}
 async function saveSupply(s){s.updatedAt=Date.now();await dbPut("supplies",s);const i=S.supplies.findIndex(x=>x.id===s.id);if(i>=0)S.supplies[i]=s;else S.supplies.push(s);}
 async function removeSupply(id){await dbDel("supplies",id);S.supplies=S.supplies.filter(x=>x.id!==id);}
 
@@ -423,8 +482,12 @@ function viewDiary(){
   if(!entries.length){body+=emptyBox("Your journal is empty","Tap the mic to talk through what you did today, or type a note. Everything you add flows into the timeline and onto each plant's page.",{a:"new-entry",label:"＋ Add first entry"});}
   else {
     body+=`<div class="filterrow">${["All",...TYPES.map(t=>t.t)].map(t=>`<button class="fchip ${S.logFilter===t?"on":""}" ${S.logFilter===t&&t!=="All"?`style="background:${eColor(t)};border-color:${eColor(t)};color:#fff"`:""} data-action="lfilter" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
-    const rows=S.logFilter==="All"?entries:entries.filter(e=>e.type===S.logFilter);
-    if(!rows.length)body+=`<p class="empty-p" style="text-align:center;margin-top:24px">No ${esc(S.logFilter.toLowerCase())} entries yet.</p>`;
+    const yrs=[...new Set(entries.map(e=>(e.date||"").slice(0,4)).filter(Boolean))].sort().reverse();
+    const fc=(act,cur,v)=>`<button class="fchip ${cur===v?"on":""}" data-action="${act}" data-t="${esc(v)}">${esc(v)}</button>`;
+    if(yrs.length>1)body+=`<div class="filterrow">${["All",...yrs].map(v=>fc("dyear",S.diaryYear,v)).join("")}</div>`;
+    body+=`<div class="filterrow">${["All",...SEASONS].map(v=>fc("dseason",S.diarySeason,v)).join("")}</div>`;
+    const rows=entries.filter(e=>(S.logFilter==="All"||e.type===S.logFilter)&&(S.diaryYear==="All"||(e.date||"").slice(0,4)===S.diaryYear)&&(S.diarySeason==="All"||seasonOfDate(e.date)===S.diarySeason));
+    if(!rows.length)body+=`<p class="empty-p" style="text-align:center;margin-top:24px">No entries match these filters.</p>`;
     let lm=null;
     rows.forEach(e=>{const mk=monthKey(e.date);if(mk!==lm){body+=`<div class="tl-month">${mk}</div>`;lm=mk;}const nm=nameOf(e);const bd=e.bedId&&bedOf(e.bedId);
       body+=`<article class="jcard">
@@ -471,26 +534,85 @@ function viewPlantDetail(){
       ${p.status==="wishlist"?`<button class="btn xs" data-action="move-growing" data-id="${p.id}">Move to growing</button>`:""}</div></div></div>
     ${rows.length?`<div class="caresheet">${rows.map(([k,v])=>`<div class="carerow"><span class="carek">${k}</span><span class="carev">${esc(v)}</span></div>`).join("")}</div>`:emptyBox("No care details yet","Tap Edit to fill in how to care for this one.")}
     ${photos.length?`<div class="pd-sec"><div class="sublabel">Progress</div><div class="photorow">${photos.map(x=>`<img data-photo="${x.pid}" data-action="view" data-eid="${x.eid}" alt="">`).join("")}</div></div>`:""}
+    ${plantHistoryHTML(p)}
     <div class="pd-sec"><div class="sublabel">This plant's log</div>
     ${evs.length?`<ul class="tl">${evs.map(e=>`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card"><div class="jcard-top"><span class="badge sm" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="muted">Nothing logged for this plant yet.</p>`}</div>
     <button class="deletebed" data-action="del-plant" data-id="${p.id}">Delete this plant page</button></div>`;
+}
+
+/* ---------------- PLANTINGS (what is in which bed, per year + season) ---------------- */
+function seasonBar(){
+  return `<div class="seasonbar"><button class="yrbtn" data-action="year-step" data-d="-1" aria-label="Previous year">‹</button><span class="yr">${S.year}</span><button class="yrbtn" data-action="year-step" data-d="1" aria-label="Next year">›</button>
+    <div class="filterrow" style="padding:0;margin-left:8px">${SEASONS.map(v=>`<button class="fchip ${S.season===v?"on":""}" data-action="season-pick" data-t="${v}">${v}</button>`).join("")}</div></div>`;
+}
+function seasonSummary(){
+  if(!S.beds.length)return"";
+  const bs=S.beds.filter(b=>plantingsFor(b.id).length);
+  if(!bs.length)return `<p class="muted" style="margin:-4px 0 16px">Nothing planted for ${S.season} ${S.year} yet. Tap a bed to add a planting.</p>`;
+  return `<div class="sublabel">In the ground · ${S.season} ${S.year}</div><ul class="plist">${bs.map(b=>`<li class="plrow tap" data-action="open-bed" data-id="${b.id}"><b>${esc(b.code||b.name)}</b><span class="plname">${plantingsFor(b.id).map(x=>{const p=plantOf(x.plantId);return glyph(p?.kind)+" "+esc(p?.name||"?");}).join(", ")}</span></li>`).join("")}</ul>`;
+}
+function plantingRow(x,showBed){
+  const p=plantOf(x.plantId),bd=bedOf(x.bedId);
+  return `<li class="plrow"><span class="badge sm" style="background:#38583F22;color:var(--green-d)">${showBed?`${x.season} ${x.year}`:x.season}</span>
+    <span class="plname">${glyph(p?.kind)} ${esc(p?.name||"(removed plant)")}${showBed&&bd?` <em>· ${esc(bd.name)}</em>`:""}</span>
+    <button class="plstat ${x.status}" data-action="cycle-planting" data-id="${x.id}" title="Tap to change status">${x.status}</button>
+    <button class="plx" data-action="del-planting" data-id="${x.id}" aria-label="Remove planting">✕</button></li>`;
+}
+function bedPlantingsHTML(id){
+  const list=S.plantings.filter(x=>x.bedId===id).sort(sortPl);
+  const head=`<div class="sublabel-row"><div class="sublabel">Plantings</div><button class="linkbtn" data-action="add-planting" data-id="${id}">＋ Add</button></div>`;
+  if(!list.length)return `<div class="pd-sec" style="margin:6px 0 16px">${head}<p class="muted">Nothing planted here yet.</p></div>`;
+  let y=null,h="";list.forEach(x=>{if(x.year!==y){h+=`<li class="plyear">${x.year}</li>`;y=x.year;}h+=plantingRow(x,false);});
+  return `<div class="pd-sec" style="margin:6px 0 16px">${head}<ul class="plist">${h}</ul></div>`;
+}
+function plantHistoryHTML(p){
+  const list=S.plantings.filter(x=>x.plantId===p.id).sort(sortPl);
+  return `<div class="pd-sec"><div class="sublabel-row"><div class="sublabel">Where I grew it</div><button class="linkbtn" data-action="add-planting-plant" data-id="${p.id}">＋ Plant in a bed</button></div>
+    ${list.length?`<ul class="plist">${list.map(x=>plantingRow(x,true)).join("")}</ul>`:`<p class="muted">Not planted in any bed yet.</p>`}</div>`;
+}
+let pldraft=null;
+function openPlantingForm(o={}){
+  const ps=S.plants.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const cur=S.year===new Date().getFullYear()&&S.season===seasonOfDate(localISO());
+  pldraft={id:uid(),createdAt:Date.now(),plantId:o.plantId||(ps[0]&&ps[0].id)||"",bedId:o.bedId||(S.beds[0]&&S.beds[0].id)||"",year:S.year,season:S.season,status:cur?"Planted":"Planned",from:o.from||"plant"};
+  const f=pldraft;
+  const opt=(v,l,sel)=>`<option value="${esc(v)}" ${sel?"selected":""}>${esc(l)}</option>`;
+  modalRoot.innerHTML=`<div class="scrim" data-action="close-pmodal"><div class="sheet" data-stop>
+    <div class="grab"></div><div class="sheet-head"><h2 class="sheet-title">Add planting</h2><button class="x" data-action="close-pmodal">✕</button></div>
+    ${ps.length&&S.beds.length?`
+    <label class="field"><span>Plant</span><select id="pl-plant">${ps.map(p=>opt(p.id,p.name||"(unnamed)",p.id===f.plantId)).join("")}</select></label>
+    <label class="field"><span>Bed</span><select id="pl-bed">${S.beds.map(b=>opt(b.id,b.name,b.id===f.bedId)).join("")}</select></label>
+    <div style="display:flex;gap:10px"><label class="field" style="flex:1"><span>Year</span><input id="pl-year" type="number" inputmode="numeric" value="${f.year}"></label>
+    <label class="field" style="flex:1"><span>Season</span><select id="pl-season">${SEASONS.map(v=>opt(v,v,v===f.season)).join("")}</select></label></div>
+    <label class="field"><span>Status</span><select id="pl-status">${PSTAT.map(v=>opt(v,v,v===f.status)).join("")}</select></label>
+    <button class="btn wide" data-action="save-planting">Save planting</button>`
+    :`<p class="muted">${!ps.length?"Add a plant on the Plants tab first.":"Add a bed on the Plot tab first."}</p>`}
+  </div></div>`;
+}
+async function savePlantingForm(){
+  const f=pldraft;if(!f)return;
+  f.plantId=$("#pl-plant").value;f.bedId=$("#pl-bed").value;f.season=$("#pl-season").value;f.status=$("#pl-status").value;
+  const y=parseInt($("#pl-year").value,10);if(!(y>=1900&&y<=2200)){toast("Enter a valid year.");return;}
+  f.year=y;const from=f.from;delete f.from;
+  await savePlanting(f);pldraft=null;modalRoot.innerHTML="";
+  if(from==="bed")openBedSheet(f.bedId);else render();
 }
 
 /* ---------------- PLOT ---------------- */
 function layoutSVG(){
   const lb=S.beds.filter(b=>b.poly);if(!lb.length)return"";
   const all=lb.flatMap(b=>b.poly),W=Math.max(...all.map(p=>p[0])),H=Math.max(...all.map(p=>p[1]));
-  const shapes=lb.map(b=>{const bx=polyBox(b.poly),n=entriesForBed(b.id).length;
+  const shapes=lb.map(b=>{const bx=polyBox(b.poly),n=entriesForBed(b.id).length,pl=plantingsFor(b.id);
     const big=b.poly.length>4?(b.id==="lay-g-l"?{x:17,y:22}:{x:14,y:16}):{x:bx.x+bx.w/2,y:bx.y+bx.h/2};
     const label=b.code||b.name;
-    return `<path class="lbed ${b.kind||"raised"}" d="M${b.poly.map(p=>p.join(" ")).join("L")}Z" data-action="open-bed" data-id="${b.id}"><title>${esc(b.name)} — ${esc(bedSizeText(b))}</title></path>
-      <text class="llabel" x="${big.x}" y="${big.y-(n?.3:0)}">${esc(label)}</text>${n?`<text class="llabel lcount" x="${big.x}" y="${big.y+.55}">${n} log${n>1?"s":""}</text>`:""}`;}).join("");
+    return `<path class="lbed ${b.kind||"raised"}${pl.length?" planted":""}" d="M${b.poly.map(p=>p.join(" ")).join("L")}Z" data-action="open-bed" data-id="${b.id}"><title>${esc(b.name)} — ${esc(bedSizeText(b))}</title></path>
+      <text class="llabel" x="${big.x}" y="${big.y-((n||pl.length)?.3:0)}">${esc(label)}</text>${pl.length?`<text class="llabel lcount" x="${big.x}" y="${big.y+.6}">${pl.slice(0,3).map(x=>glyph(plantOf(x.plantId)?.kind)).join("")}${pl.length>3?"+":""}</text>`:n?`<text class="llabel lcount" x="${big.x}" y="${big.y+.55}">${n} log${n>1?"s":""}</text>`:""}`;}).join("");
   const raised=lb.filter(b=>b.kind==="raised").length,ground=lb.length-raised;
   return `<div class="layoutmap"><svg viewBox="-.5 -.5 ${W+1} ${H+1}" role="img" aria-label="Plot layout">${shapes}</svg>
-    <div class="llegend"><span><i style="background:#F2D9C9"></i>Ground (${lb.filter(b=>b.kind==="ground").length})</span><span><i style="background:#FBFAF4"></i>Raised (${raised})</span><span>1 square = 2 ft</span></div></div>`;
+    <div class="llegend"><span><i style="background:#F2D9C9"></i>Ground (${lb.filter(b=>b.kind==="ground").length})</span><span><i style="background:#FBFAF4"></i>Raised (${raised})</span><span><i style="background:#DCE8CF"></i>Planted this season</span><span>1 square = 2 ft</span></div></div>`;
 }
 function viewPlot(){
-  let body=layoutSVG();
+  let body=seasonBar()+layoutSVG()+seasonSummary();
   const off=S.beds.filter(b=>!b.poly&&b.x==null);
   const offHTML=off.length?`<div class="pd-sec"><div class="sublabel">Beds not on the map</div><div class="chiprow">${off.map(b=>`<button class="chip" data-action="open-bed" data-id="${b.id}">${esc(b.name)}</button>`).join("")}</div></div>`:"";
   if(!S.mapId){
@@ -678,6 +800,7 @@ function openBedSheet(id){
     <div class="grab"></div><div class="sheet-head"><input id="bedname" value="${esc(b.name)}" style="font-family:'Fraunces',serif;font-size:22px;border:none;border-bottom:2px solid var(--green);background:none;padding:2px 0;width:70%"><button class="x" data-action="close-modal2">✕</button></div>
     ${b.poly?`<div class="bedmeta">${esc(bedSizeText(b))}</div>`:""}
     <button class="btn wide" style="margin-bottom:14px" data-action="log-for-bed" data-id="${id}">＋ Log in this bed</button>
+    ${bedPlantingsHTML(id)}
     ${evs.length?`<ul class="tl">${evs.map(e=>`<li class="tl-item"><span class="tl-dot" style="background:${eColor(e.type)}"></span><div class="tl-card"><div class="jcard-top"><span class="badge sm" style="background:${eColor(e.type)}22;color:${eColor(e.type)}">${esc(e.type)}</span><span class="jdate">${fmt(e.date)}</span></div>${nameOf(e)?`<div class="jtag">${esc(nameOf(e))}</div>`:""}${e.text?`<div class="tl-detail">${esc(e.text)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="muted" style="text-align:center;padding:12px">Nothing logged in this bed yet.</p>`}
     <button class="deletebed" data-action="del-bed" data-id="${id}">Delete this bed</button>
   </div></div>`;
@@ -754,6 +877,16 @@ document.addEventListener("click",async ev=>{
     case "open-bed": openBedSheet(id);break;
     case "log-for-bed": modalRoot.innerHTML="";openEntryForm({bedId:id});break;
     case "del-bed": if(confirm("Delete this bed?")){await removeBed(id);modalRoot.innerHTML="";render();}break;
+
+    case "year-step": S.year+=+t.getAttribute("data-d");render();break;
+    case "season-pick": S.season=t.getAttribute("data-t");render();break;
+    case "dyear": S.diaryYear=t.getAttribute("data-t");render();break;
+    case "dseason": S.diarySeason=t.getAttribute("data-t");render();break;
+    case "add-planting": modalRoot.innerHTML="";openPlantingForm({bedId:id,from:"bed"});break;
+    case "add-planting-plant": openPlantingForm({plantId:id,from:"plant"});break;
+    case "save-planting": savePlantingForm();break;
+    case "cycle-planting": {const x=S.plantings.find(y=>y.id===id);if(x){x.status=PSTAT[(PSTAT.indexOf(x.status)+1)%PSTAT.length];await savePlanting(x);if($("#bedname"))openBedSheet(x.bedId);else render();}}break;
+    case "del-planting": if(confirm("Remove this planting?")){const x=S.plantings.find(y=>y.id===id);await removePlanting(id);if($("#bedname")&&x)openBedSheet(x.bedId);else render();}break;
 
     case "view": openViewer(t.getAttribute("data-eid"),t.getAttribute("data-photo")||t.getAttribute("data-photo-pick"));break;
 
